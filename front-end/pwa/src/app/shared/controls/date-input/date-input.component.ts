@@ -29,17 +29,13 @@ export class DateInputComponent implements OnInit, OnChanges {
    
   }
   protected onValueChange(value: string) {
-    if(value){
-      this.valueChange.emit(value);
-    }else{
-      this.valueChange.emit(null);
-    }
- 
+    this.valueChange.emit(value ? value : null);
   }
 
   protected onInputClick(): void {
     this.inputClick.emit(this.value);
   }
+  
   protected onEnterKeyPressed() {
     this.inputEnterKeyPress.emit(this.value);
   }

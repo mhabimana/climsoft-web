@@ -1,42 +1,50 @@
 
 services:
-  pwa:
-    build:
-      context: ./front-end/pwa
-      dockerfile: Dockerfile
+  climsoft_pwa:
+    image: patowiz/climsoft-pwa
+    container_name: climsoft-pwa
     restart: always
     ports:
       - "4200:80"
     depends_on:
-      - api
+      - climsoft_api
+    networks:
+      - climsoft_network
 
-  api:
-    build:
-      context: ./back-end/api
-      dockerfile: Dockerfile
+  climsoft_api:
+    image: patowiz/climsoft-api
+    container_name: climsoft-api
     restart: always
     environment:
-      DB_HOST: db
-      DB_USERNAME: postgres
-      DB_PASSWORD: password
+      DB_HOST: climsoft_db
+      DB_USERNAME: ${DB_USERNAME:-my_user}
+      DB_PASSWORD: ${DB_PASSWORD:-my_password}
       DB_PORT: 5432      
       DB_NAME: climsoft
     ports:
       - "3000:3000"
     depends_on:
-      - db
+      - climsoft_db
+    networks:
+      - climsoft_network
 
-  db:
-    image: postgres:16.2
+  climsoft_db:
+    image: postgis/postgis:17-3.4
+    container_name: climsoft-db
     restart: always
     environment:
-      POSTGRES_DB: climsoft
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: password 
+      POSTGRES_DB: ${POSTGRES_DB:-climsoft}
+      POSTGRES_USER: ${POSTGRES_USER:-my_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-my_password} 
     ports:
       - "5432:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      - climsoft_data:/var/lib/postgresql/data
+    networks:
+      - climsoft_network
 
 volumes:
-  pgdata:
+  climsoft_data:
+
+networks:
+  climsoft_network:

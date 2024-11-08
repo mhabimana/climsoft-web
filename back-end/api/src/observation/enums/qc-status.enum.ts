@@ -1,5 +1,5 @@
 export enum QCStatusEnum {
-    NoQCTestsDone = "none", // No QC tests done
-    QCTestsDoneWithFailures = "partial", // All QC tests done, some failed
-    AllQCTestsPassedOrAccepted = "passed" // All QC tests done. All passed or some failed but were accepted as passed
+    NONE = "none", // No QC tests done
+    PASSED = "passed", // All QC tests done. All passed or some failed but were enforced as passed
+    FAILED = "failed" // Some QC tests failed
 }

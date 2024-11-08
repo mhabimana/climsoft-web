@@ -2,8 +2,9 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { HttpClientModule } from '@angular/common/http';
 //--------------------------------
-
+ 
 //--------- components ------------
 import { TextInputComponent } from './controls/text-input/text-input.component';
 import { DateInputComponent } from './controls/date-input/date-input.component';
@@ -12,7 +13,6 @@ import { YearInputComponent } from './controls/year-input/year-input.component';
 import { MonthInputComponent } from './controls/month-input/month-input.component';
 import { DayInputComponent } from './controls/day-input/day-input.component'; 
 import { DataListViewComponent } from './controls/data-list-view/data-list-view.component';
-import { HTTP_INTERCEPTORS, HttpClientModule } from '@angular/common/http';
 import { NumberInputComponent } from './controls/number-input/number-input.component';
 import { TableViewComponent } from './controls/table-view/table-view.component';
 import { DialogComponent } from './controls/dialog/dialog.component';
@@ -32,9 +32,26 @@ import { SourceSingleInputComponent } from './controls/source-input/source-singl
 import { StationSingleInputComponent } from './controls/station-input/station-single-input/station-single-input.component';
 import { StationMultipleInputComponent } from './controls/station-input/station-multiple-input/station-multiple-input.component';
 import { LabelInputComponent } from './controls/label-input/label-input.component';
+import { StationObsMethodSingleInputComponent } from './controls/station-obs-method-input/station-obs-method-single-input/station-obs-method-single-input.component';
+import { StationObsEnvSingleInputComponent } from './controls/station-obs-env-input/station-obs-environment-single-input/station-obs-env-single-input.component';
+import { StationObservationFocusSingleInputComponent } from './controls/station-obs-focus-input/station-obs-focus-single-input/station-obs-focus-single-input.component';
+import { StationStatusSingleInputComponent } from './controls/station-status-input/station-status-single-input/station-status-single-input.component';
+import { DropDownButtonComponent } from './controls/drop-down-button/drop-down-button.component'; 
+import { ElementDomainSingleInputComponent } from './controls/element-domain-input/element-domain-single-input/element-domain-single-input.component';
+import { ElementSubdomainSingleInputComponent } from './controls/element-subdomain-input/element-subdomain-single-input/element-subdomain-single-input.component';
+import { ElementTypeSingleInputComponent } from './controls/element-type-input/element-type-single-input/element-type-single-input.component';
+import { CheckBoxInputComponent } from './controls/check-box-input/check-box-input.component';
+import { RadioButtonsInputComponent } from './controls/radio-buttons-input/radio-buttons-input.component';
+import { ServerTypeInputComponent } from './controls/server-type-input/server-type-input.component';
+import { FlagSingleInputComponent } from './controls/flag-input/flag-single-input/flag-single-input.component';
+import { PageInputComponent } from './controls/page-input/page-input.component';
+import { DropDownContainerComponent } from './controls/drop-down-container/drop-down-container.component';
+import { RegionTypeInputComponent } from './controls/region-type-input/region-type-input.component';
+import { MapComponent } from './controls/map/map.component';
+import { DataStructureInputComponent } from './controls/data-structure-input/data-structure-input.component';
 
 //--------------------------------
-
+  
 const angularModules = [
   CommonModule,
   ReactiveFormsModule,
@@ -50,6 +67,8 @@ const controlsComponents = [
   NumberInputComponent,
   SelectorInputComponent,
   DateInputComponent,
+  CheckBoxInputComponent,
+  RadioButtonsInputComponent,
 
   YearInputComponent,
   MonthInputComponent,
@@ -67,17 +86,26 @@ const controlsComponents = [
   ElementMultipleInputComponent,
   HourSingleInputComponent,
   HourMultipleInputComponent,
-
   YearMonthInputComponent,
-
   PeriodSingleInputComponent,
   SourceSingleInputComponent,
-
   StationSingleInputComponent,
   StationMultipleInputComponent,
-
-
-
+  StationObsMethodSingleInputComponent,
+  StationObsEnvSingleInputComponent,
+  StationObservationFocusSingleInputComponent,
+  StationStatusSingleInputComponent,
+  DropDownButtonComponent,    
+  ElementDomainSingleInputComponent,  
+  ElementSubdomainSingleInputComponent,
+  ElementTypeSingleInputComponent,
+  ServerTypeInputComponent,
+  FlagSingleInputComponent,
+  PageInputComponent,
+  DropDownContainerComponent, 
+  RegionTypeInputComponent,
+  MapComponent,
+  DataStructureInputComponent,
 ];
 
 const directives = [
@@ -88,15 +116,10 @@ const directives = [
 @NgModule({
   declarations: [
     ...controlsComponents,
-    ...directives,
-  
-   
-  
-  
+    ...directives, 
   ],
   imports: [
     ...angularModules,
-
   ],
   providers: [
    
@@ -105,8 +128,6 @@ const directives = [
     ...angularModules,
     ...controlsComponents,
     ...directives,
-
-
 
   ]
 })

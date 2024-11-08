@@ -1,8 +1,6 @@
-import { Component, OnInit, Input, Output, EventEmitter, SimpleChanges, OnChanges } from '@angular/core';
-import { SourceModel } from 'src/app/core/models/source.model';
-import { StationModel } from 'src/app/core/models/station.model';
-import { SourcesService } from 'src/app/core/services/sources.service';
-import { StationsService } from 'src/app/core/services/stations.service';
+import { Component, OnInit, Input, Output, EventEmitter, SimpleChanges, OnChanges } from '@angular/core'; 
+import { CreateStationModel } from 'src/app/core/models/stations/create-station.model'; 
+import { StationsService } from 'src/app/core/services/stations/stations.service';
 
 @Component({
   selector: 'app-station-single-input',
@@ -11,15 +9,16 @@ import { StationsService } from 'src/app/core/services/stations.service';
 })
 export class StationSingleInputComponent implements OnInit, OnChanges {
 
-  @Input() public label: string = 'Station';
-  @Input() public errorMessage: string = '';
-  @Input() public placeholder: string | null = null;
+  @Input() public id!: string;
+  @Input() public label!: string;
+  @Input() public errorMessage!: string;
+  @Input() public placeholder!: string;
   @Input() public includeOnlyIds!: number[];
   @Input() public selectedId!: string | null;
-  @Output() public selectedIdChange = new EventEmitter<string | null>();
+  @Output() public selectedIdChange = new EventEmitter<string>();
 
-  protected options!: StationModel[];
-  protected selectedOption!: StationModel | null;
+  protected options!: CreateStationModel[];
+  protected selectedOption!: CreateStationModel | null;
 
   constructor(private stationsService: StationsService) {
 
@@ -32,7 +31,7 @@ export class StationSingleInputComponent implements OnInit, OnChanges {
 
     //load the stations once. TODO. later do filter based on different conditions 
     if (!this.options || (this.includeOnlyIds && this.includeOnlyIds.length > 0)) {
-      this.stationsService.getStations().subscribe(data => {
+      this.stationsService.find().subscribe(data => {
         this.options = data;
         this.setInputSelectedOption();
       });
@@ -49,17 +48,17 @@ export class StationSingleInputComponent implements OnInit, OnChanges {
     }
   }
 
-  protected optionDisplayFunction(option: StationModel): string {
+  protected optionDisplayFunction(option: CreateStationModel): string {
     return option.name;
   }
 
-  protected onSelectedOptionChange(selectedOption: StationModel | null) {
+  protected onSelectedOptionChange(selectedOption: CreateStationModel | null) {
     if (selectedOption) {
       //this.selectedId = selectedOption.id;
       this.selectedIdChange.emit(selectedOption.id);
     } else {
       //this.selectedId = null;
-      this.selectedIdChange.emit(null);
+      this.selectedIdChange.emit('');
     }
 
   }

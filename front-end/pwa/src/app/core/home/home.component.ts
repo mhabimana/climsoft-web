@@ -1,10 +1,10 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
-import { ViewPortSize, ViewportService } from 'src/app/core/services/viewport.service';
+import { ViewPortSize, ViewportService } from 'src/app/core/services/view-port.service';
 import { PagesDataService, ToastEvent } from '../services/pages-data.service';
 import { Subscription, take } from 'rxjs';
-import { AuthService } from '../services/auth.service';
-import { Router } from '@angular/router';
-import { UserRoleEnum } from '../models/enums/user-roles.enum';
+import { AuthService } from '../services/users/auth.service';
+import { ActivatedRoute, Router } from '@angular/router';
+import { UserRoleEnum } from '../models/users/user-role.enum';
 
 
 @Component({
@@ -25,23 +25,23 @@ export class HomeComponent implements OnInit, OnDestroy {
     },
     {
       name: 'Data Entry',
-      url: '/dataentry',
+      url: '/data-entry',
       icon: 'bi bi-file-earmark-text',
       open: false,
       children: [
         {
           name: 'Forms',
           url: '/station-form-selection',
-          featureTitle: 'Data Entry'
+          featureTitle: 'Form Data Entry'
         },
         {
           name: 'Import',
-          url: '/import-entry',
-          featureTitle: 'Import Data'
+          url: '/import-selection',
+          featureTitle: 'Import Data Entry'
         },
         {
-          name: 'View Entries',
-          url: '/view-entry',
+          name: 'Manage Data',
+          url: '/manage-data',
           featureTitle: 'View Entries'
         }
       ]
@@ -52,21 +52,26 @@ export class HomeComponent implements OnInit, OnDestroy {
       url: '/metadata',
       icon: 'bi bi-chat-dots',
       open: false,
-      children: [        
+      children: [
         {
           name: 'Elements',
           url: '/elements',
           featureTitle: 'Elements'
         },
         {
-          name: 'Forms',
-          url: '/forms',
-          featureTitle: 'Entry Forms'
+          name: 'Sources',
+          url: '/sources',
+          featureTitle: 'Sources'
         },
         {
           name: 'Stations',
           url: '/stations',
           featureTitle: 'Stations'
+        },
+        {
+          name: 'Regions',
+          url: '/view-regions',
+          featureTitle: 'Regions'
         }
       ]
     },
@@ -76,6 +81,19 @@ export class HomeComponent implements OnInit, OnDestroy {
       icon: 'bi bi-people',
       open: false,
       children: []
+    },
+    {
+      name: 'Settings',
+      url: '/settings',
+      icon: 'bi bi-people',
+      open: false,
+      children: [
+        {
+          name: 'General',
+          url: '/view-general-settings',
+          featureTitle: 'General'
+        },
+      ]
     }
 
 
@@ -89,20 +107,7 @@ export class HomeComponent implements OnInit, OnDestroy {
 
   constructor(private viewPortService: ViewportService,
     private authService: AuthService,
-    private pagesDataService: PagesDataService, private router: Router) {
-
-    this.viewPortService.viewPortSize.subscribe((viewPortSize) => {
-      this.bOpenSideNav = viewPortSize === ViewPortSize.Large;
-    });
-
-    this.pagesDataService.pageHeader.subscribe(name => {
-      this.pageHeaderName = name;
-    });
-
-    this.pagesDataService.toastEvents.subscribe(toast => {
-      this.showToast(toast);
-    });
-
+    private pagesDataService: PagesDataService) {
   }
 
   ngOnInit(): void {
@@ -110,6 +115,25 @@ export class HomeComponent implements OnInit, OnDestroy {
       if (user) {
         this.setAllowedNavigationLinks(user.role);
       }
+    });
+
+    this.viewPortService.viewPortSize.subscribe((viewPortSize) => {
+      this.bOpenSideNav = viewPortSize === ViewPortSize.LARGE;
+    });
+
+    this.pagesDataService.pageHeader.subscribe(name => {
+      // To prevent `ExpressionChangedAfterItHasBeenCheckedError` raised in dvelopment mode 
+      // where a child component changes a parent component’s data during a lifecycle hook like `ngOnInit` or ``ngAfterViewInit`
+      // Wrap the changes in time out function
+      setTimeout(() => {
+        this.pageHeaderName = name;
+      }, 0);
+
+
+    });
+
+    this.pagesDataService.toastEvents.subscribe(toast => {
+      this.showToast(toast);
     });
   }
 
@@ -127,9 +151,7 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private showToast(currentToast: ToastEvent) {
-
     this.toasts.push(currentToast);
-
     // automatically hide the toast after 3 seconds
     setTimeout(() => {
       if (this.toasts.length > 0) {
@@ -137,12 +159,11 @@ export class HomeComponent implements OnInit, OnDestroy {
         this.toasts.splice(0, 1);
       }
     }, 3000);
-
   }
 
   private setAllowedNavigationLinks(role: UserRoleEnum): void {
     // TODO. Change this implementation after changing the structure of the array
-    if (role !== UserRoleEnum.Administrator) {
+    if (role !== UserRoleEnum.ADMINISTRATOR) {
       this.featuresNavItems.splice(3, 1);
     }
 

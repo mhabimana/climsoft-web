@@ -10,7 +10,7 @@ export class DateUtils {
      */
     static getDaysInMonthList(year: number, month: number): { [key: string]: any }[] {
         const allDays: { [key: string]: any }[] = [];
-        const lastDay: number = DateUtils.getLastDayOfMonth(year,month);
+        const lastDay: number = DateUtils.getLastDayOfMonth(year, month);
         for (let i = 1; i <= lastDay; i++) {
             allDays.push({ id: i, name: `Day ${i.toString().padStart(2, '0')}` });
         }
@@ -36,7 +36,8 @@ export class DateUtils {
      * @returns 
      */
     static getLastDayOfMonth(year: number, month: number): number {
-        return new Date(year, month, 0).getDate();
+        // The zero day will make the date object to automatically roll back to the last day of the previous month
+        return new Date(year, month + 1, 0).getDate();
     }
 
     static getTodayDateInSQLFormat(): string {
@@ -48,6 +49,19 @@ export class DateUtils {
     static getDateInSQLFormat(year: number, month: number, day: number, hour: number, minute: number, second: number): string {
         return `${year.toString()}-${StringUtils.addLeadingZero(month)}-${StringUtils.addLeadingZero(day)} ${StringUtils.addLeadingZero(hour)}:${StringUtils.addLeadingZero(minute)}:${StringUtils.addLeadingZero(second)}`
     }
+
+    public static getDateInSQLFormatFromDate(date: Date, useUTC: boolean): string {
+        const pad = (num: number): string => num.toString().padStart(2, '0');
+        const getYear = useUTC ? date.getUTCFullYear() : date.getFullYear();
+        const getMonth = pad((useUTC ? date.getUTCMonth() : date.getMonth()) + 1); // getMonth() is zero-based
+        const getDay = pad(useUTC ? date.getUTCDate() : date.getDate());
+        const getHours = pad(useUTC ? date.getUTCHours() : date.getHours());
+        const getMinutes = pad(useUTC ? date.getUTCMinutes() : date.getMinutes());
+        const getSeconds = pad(useUTC ? date.getUTCSeconds() : date.getSeconds());
+        const getMilliseconds = (useUTC ? date.getUTCMilliseconds() : date.getMilliseconds()).toString().padStart(3, '0');
+      
+        return `${getYear}-${getMonth}-${getDay} ${getHours}:${getMinutes}:${getSeconds}.${getMilliseconds}`;
+      }
 
     static getDayFromSQLDate(sqlDate: string): number {
         return Number(sqlDate.substring(8, 10));

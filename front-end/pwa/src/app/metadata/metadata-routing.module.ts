@@ -1,13 +1,14 @@
 import { NgModule } from '@angular/core';
-import { RouterModule, Routes } from '@angular/router'; 
-import { FormsComponent } from './forms/forms.component';
-import { StationsComponent } from './stations/stations.component';
-import { StationDetailComponent } from './station-detail/station-detail.component';
-import { ElementsComponent } from './elements/elements.component';
-import { ElementDetailComponent } from './element-detail/element-detail.component';
-import { FormDetailComponent } from './form-detail/form-detail.component';
-import { StationCharacteristicsComponent } from './station-characteristics/station-characteristics.component';
-
+import { RouterModule, Routes } from '@angular/router';  
+import { ViewStationsComponent } from './stations/view-stations/view-stations.component';
+import { ViewElementsComponent } from './elements/view-elements/view-elements.component';
+import { ElementDetailComponent } from './elements/element-detail/element-detail.component';
+import { FormSourceDetailComponent } from './sources/form-source-detail/form-source-detail.component';
+import { ViewSourcesComponent } from './sources/view-sources/view-sources.component';
+import { StationDetailComponent } from './stations/station-detail/station-detail.component';
+import { ImportSourceDetailComponent } from './sources/import-source-detail/import-source-detail.component';
+import { ViewRegionsComponent } from './regions/view-regions/view-regions.component';
+import { ImportRegionsComponent } from './regions/import-regions/import-regions.component';
 
 const routes: Routes = [
   {
@@ -18,40 +19,47 @@ const routes: Routes = [
     children: [
       {
         path: '',
-        redirectTo: 'forms',
+        redirectTo: 'elements',
         pathMatch: 'full',
       },
       {
-        path: 'forms',
-        component: FormsComponent, 
-        data: {
-          subComponent: true
-        }
+        path: 'elements',
+        component: ViewElementsComponent, 
+      },
+      {
+        path: 'element-detail/:id',
+        component: ElementDetailComponent
+      },
+      {
+        path: 'sources',
+        component: ViewSourcesComponent, 
       }, 
       {
-        path: 'form-detail/:id',
-        component: FormDetailComponent
+        path: 'form-source-detail/:id',
+        component: FormSourceDetailComponent
+      },
+      {
+        path: 'import-source-detail/:id',
+        component: ImportSourceDetailComponent
       },
       {
         path: 'stations',
-        component: StationsComponent
+        component: ViewStationsComponent, 
       },
       {
         path: 'station-detail/:id',
         component: StationDetailComponent
       },
       {
-        path: 'station-characteristics/:id',
-        component: StationCharacteristicsComponent
+        path: 'view-regions',
+        component: ViewRegionsComponent
       },
       {
-        path: 'elements',
-        component: ElementsComponent
-      },
-      {
-        path: 'element-detail/:id',
-        component: ElementDetailComponent
-      },
+        // TODO. Remove this later
+        path: 'import-regions',
+        component: ImportRegionsComponent
+      }  
+     
     ]
   }
  

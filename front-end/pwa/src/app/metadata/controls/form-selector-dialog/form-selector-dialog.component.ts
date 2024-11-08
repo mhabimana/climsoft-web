@@ -1,9 +1,10 @@
 import { Component, Input, Output, EventEmitter } from '@angular/core';
-import { Observable } from 'rxjs';
-import { SourceModel } from 'src/app/core/models/source.model';
-import { SourcesService } from 'src/app/core/services/sources.service';
+import {  take } from 'rxjs'; 
+import { SourceTypeEnum } from 'src/app/metadata/sources/models/source-type.enum';
+import { ViewSourceModel } from 'src/app/metadata/sources/models/view-source.model';
+import { SourcesService } from 'src/app/core/services/sources/sources.service';
 
-export interface ItemSelection extends SourceModel {
+export interface ItemSelection extends ViewSourceModel {
   selected: boolean;
 }
 
@@ -31,8 +32,10 @@ export class FormSelectorDialogComponent {
     this.showSelectedIdsOnly = showSelectedIdsOnly;
     this.open = true;
 
-    const elementSubscription: Observable<SourceModel[]> = this.showSelectedIdsOnly ? this.sourcesService.getForms(this.selectedIds) : this.sourcesService.getForms();
-    elementSubscription.subscribe(data => {
+    //TODO. Later implement showSelectedIdsOnly functionality
+    this.sourcesService.findBySourceType(SourceTypeEnum.FORM).pipe(
+      take(1)
+    ).subscribe(data => {
       this.items = data
         .filter(item => !this.excludeIds.includes(item.id))
         .map(item => ({ ...item, selected: this.selectedIds.includes(item.id) }));

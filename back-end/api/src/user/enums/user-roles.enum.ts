@@ -1,6 +1,6 @@
 export enum UserRoleEnum {
-    Administrator = "Administrator",
-    Approver = "Approver",
-    EntryClerk = "EntryClerk",
-    Viewer = "Viewer", 
+    ADMINISTRATOR = "administrator",
+    REVIEWER = "reviewer",
+    ENTRY_CLERK = "entry_clerk",
+    VIEWER = "viewer", 
 }

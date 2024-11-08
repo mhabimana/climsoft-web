@@ -1,73 +1,77 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from "typeorm";
+import { Check, Column, Entity, Index, JoinColumn, ManyToOne, PrimaryColumn } from "typeorm";
 import { FlagEnum } from "../enums/flag.enum";
 import { QCStatusEnum } from "../enums/qc-status.enum";
-import { BaseEntity, BaseLogVo } from "src/shared/entity/base-entity";
-import { StationEntity } from "src/metadata/entities/station.entity";
-import { ElementEntity } from "src/metadata/entities/element.entity";
-import { SourceEntity } from "src/metadata/entities/source.entity";
+import { AppBaseEntity, BaseLogVo } from "src/shared/entity/app-base-entity";
+import { StationEntity } from "src/metadata/stations/entities/station.entity";
+import { ElementEntity } from "src/metadata/elements/entities/element.entity";
+import { SourceEntity } from "src/metadata/sources/entities/source.entity";
 
 @Entity("observations")
-export class ObservationEntity extends BaseEntity {
+@Check("CHK_observations_both_value_and_flag_not_null", `"value" IS NOT NULL OR "flag" IS NOT NULL`)
+export class ObservationEntity extends AppBaseEntity {
 
-  @PrimaryColumn({ type: "varchar", name: "station_id" })
+  @PrimaryColumn({ name: "station_id", type: "varchar" })
   stationId: string;
 
-  @PrimaryColumn({ type: "int", name: "element_id" })
+  @PrimaryColumn({ name: "element_id", type: "int" })
   elementId: number;
 
-  @PrimaryColumn({ type: "int", name: "source_id" })
-  sourceId: number;
-
-  @PrimaryColumn({ type: "float" })
+  /**
+   * Elevation in reference to the station surface. 
+   * Can above or below the station surface depending on the element.
+   */
+  @PrimaryColumn({ name: "elevation", type: "float" })
   elevation: number;
 
-  @PrimaryColumn({ type: "timestamptz", name: "date_time" })
+  @PrimaryColumn({ name: "date_time", type: "timestamptz" })
   datetime: Date;
 
-  @PrimaryColumn({ type: "int" })
+  @PrimaryColumn({ name: "period", type: "int" })
   period: number;
 
-  @Column({ type: "float", nullable: true })
+  @PrimaryColumn({ name: "source_id", type: "int" })
+  sourceId: number;
+
+  @Column({ name: "value", type: "float", nullable: true })
   value: number | null;
 
-  @Column({ type: "enum", enum: FlagEnum, nullable: true })
+  @Column({ name: "flag", type: "enum", enum: FlagEnum, nullable: true })
   flag: FlagEnum | null;
 
-  @Column({ type: "enum", enum: QCStatusEnum, default: QCStatusEnum.NoQCTestsDone, name: "qc_status" })
+  @Column({ name: "qc_status", type: "enum", enum: QCStatusEnum, default: QCStatusEnum.NONE })
   @Index()
   qcStatus: QCStatusEnum;
 
-  @Column({ type: "jsonb", nullable: true, name: "qc_test_log" })
-  qcTestLog: string | null;
+  @Column({ name: "qc_test_log", type: "jsonb", nullable: true })
+  qcTestLog: QCTestLogVo | null;
 
-  @Column({ type: "boolean", default: false })
+  @Column({ name: "final", type: "boolean", default: false })
   @Index()
   final: boolean;
 
-  @Column({ type: "varchar", nullable: true })
+  @Column({ name: "comment", type: "varchar", nullable: true })
   comment: string | null;
 
-  @Column({ type: "boolean", default: false })
+  @Column({ name: "deleted", type: "boolean", default: false })
   @Index()
   deleted: boolean;
 
-  @Column({ type: "jsonb", nullable: true })
+  @Column({ name: "log", type: "jsonb", nullable: true })
   log: UpdateObservationValuesLogVo[] | null;
 
   // Relationships
 
-  @ManyToOne(() => StationEntity, { onDelete: "CASCADE" })
+  @ManyToOne(() => StationEntity, { onDelete: "RESTRICT" })
   @JoinColumn({ name: "station_id" })
   station: StationEntity;
 
-  @ManyToOne(() => ElementEntity, { onDelete: "CASCADE" })
+  @ManyToOne(() => ElementEntity, { onDelete: "RESTRICT" })
   @JoinColumn({ name: "element_id" })
   element: ElementEntity;
 
-  @ManyToOne(() => SourceEntity, { onDelete: "CASCADE" })
+  @ManyToOne(() => SourceEntity, { onDelete: "RESTRICT" })
   @JoinColumn({ name: "source_id" })
   source: SourceEntity;
-
 }
 
 //when changing qc, we will use the qc log
@@ -77,4 +81,10 @@ export interface UpdateObservationValuesLogVo extends BaseLogVo {
   final: boolean;
   comment: string | null;
   deleted: boolean;
+}
+
+export interface QCTestLogVo {
+  qc_id: number;
+  enforcedBy?: number;
+  enforcedDate?: Date;
 }

@@ -1,6 +1,7 @@
 import { Component, OnInit, Input, Output, EventEmitter, SimpleChanges, OnChanges } from '@angular/core';
-import { ElementModel } from 'src/app/core/models/element.model';
-import { ElementsService } from 'src/app/core/services/elements.service';
+import { Observable } from 'rxjs';
+import { ViewElementModel } from 'src/app/core/models/elements/view-element.model';
+import { ElementsService } from 'src/app/core/services/elements/elements.service';
 
 @Component({
   selector: 'app-element-single-input',
@@ -8,14 +9,15 @@ import { ElementsService } from 'src/app/core/services/elements.service';
   styleUrls: ['./element-single-input.component.scss']
 })
 export class ElementSingleInputComponent implements OnInit, OnChanges {
-  @Input() public label: string = 'Element';
-  @Input() errorMessage: string = '';
+  @Input() public id!: string | number;
+  @Input() public label!: string;
+  @Input() public errorMessage: string = '';
   @Input() public includeOnlyIds!: number[];
   @Input() public selectedId!: number | null;
-  @Output() public selectedIdChange = new EventEmitter<number | null>();
+  @Output() public selectedIdChange = new EventEmitter<number>();
 
-  protected options!: ElementModel[] ;
-  protected selectedOption!: ElementModel | null;
+  protected options!: ViewElementModel[] ;
+  protected selectedOption!: ViewElementModel | null;
 
   constructor(private elementsSevice: ElementsService) {
   }
@@ -24,11 +26,14 @@ export class ElementSingleInputComponent implements OnInit, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges): void {
-
     //load the elements once
     if (!this.options || (this.includeOnlyIds && this.includeOnlyIds.length>0)) { 
-      this.elementsSevice.getElements(this.includeOnlyIds).subscribe(data => {
-        this.options = data;
+      this.elementsSevice.find().subscribe(data => {   
+        if(this.includeOnlyIds && this.includeOnlyIds.length>0){
+          this.options  = data.filter(item => this.includeOnlyIds.includes(item.id));
+        }else{
+          this.options = data;
+        }
         this.setInputSelectedOption();
       });
     }else{
@@ -44,17 +49,16 @@ export class ElementSingleInputComponent implements OnInit, OnChanges {
     }
   }
 
-  protected optionDisplayFunction(option: ElementModel): string {
+  protected optionDisplayFunction(option: ViewElementModel): string {
     return option.name;
   }
 
-  protected onSelectedOptionChange(selectedOption: ElementModel | null) {
+  protected onSelectedOptionChange(selectedOption: ViewElementModel | null) {
     if (selectedOption) {
       //this.selectedId = selectedOption.id;
       this.selectedIdChange.emit(selectedOption.id);
     } else {
-      //this.selectedId = null;
-      this.selectedIdChange.emit(null);
+      this.selectedIdChange.emit(-1);
     }
 
   }

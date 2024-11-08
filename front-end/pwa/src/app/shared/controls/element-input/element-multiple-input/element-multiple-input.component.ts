@@ -1,6 +1,7 @@
 import { Component, OnInit, Input, Output, EventEmitter, SimpleChanges, OnChanges } from '@angular/core';
-import { ElementModel } from 'src/app/core/models/element.model';
-import { ElementsService } from 'src/app/core/services/elements.service';
+import { Observable } from 'rxjs';
+import { ViewElementModel } from 'src/app/core/models/elements/view-element.model';
+import { ElementsService } from 'src/app/core/services/elements/elements.service';
 
 @Component({
   selector: 'app-element-multiple-input',
@@ -9,13 +10,14 @@ import { ElementsService } from 'src/app/core/services/elements.service';
 })
 export class ElementMultipleInputComponent implements OnInit, OnChanges {
   @Input() public label: string = 'Element';
+  @Input() public placeholder!: string ;
   @Input() public errorMessage: string = '';
   @Input() public includeOnlyIds: number[]=[];
   @Input() public selectedIds: number[]=[];
   @Output() public selectedIdsChange = new EventEmitter<number[]>();
 
-  protected options!: ElementModel[];
-  protected selectedOptions: ElementModel[]=[];
+  protected options!: ViewElementModel[];
+  protected selectedOptions: ViewElementModel[]=[];
 
   constructor(private elementsSevice: ElementsService) {
  
@@ -30,8 +32,8 @@ export class ElementMultipleInputComponent implements OnInit, OnChanges {
     }
 
     //load the elements once
-    if (!this.options || this.includeOnlyIds.length>0) { 
-      this.elementsSevice.getElements(this.includeOnlyIds).subscribe(data => {
+    if (!this.options || this.includeOnlyIds.length>0) {
+      this.elementsSevice.find().subscribe(data => {
         this.options = data;
         this.setInputSelectedOptions();
       });
@@ -49,11 +51,11 @@ export class ElementMultipleInputComponent implements OnInit, OnChanges {
     }
   }
 
-  protected optionDisplayFunction(option: ElementModel): string {
+  protected optionDisplayFunction(option: ViewElementModel): string {
     return option.name;
   }
 
-  protected onSelectedOptionsChange(selectedOptions: ElementModel[]) {
+  protected onSelectedOptionsChange(selectedOptions: ViewElementModel[]) {
 
     this.selectedIds.length = 0;
     for (const option of selectedOptions) {

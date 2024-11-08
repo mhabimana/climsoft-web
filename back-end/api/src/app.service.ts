@@ -1,8 +1,14 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleInit } from '@nestjs/common';
+import { MigrationsService } from './migrations/migrations.service';
+import { DataSource } from 'typeorm';
 
 @Injectable()
-export class AppService {
-  getHello(): string {
-    return 'Hello World!';
-  }
+export class AppService  implements OnModuleInit {
+
+  constructor( 
+    private readonly migrationMetadataService: MigrationsService) { }
+
+    async onModuleInit() {
+      await this.migrationMetadataService.doMigrations();
+    }
 }

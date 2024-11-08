@@ -5,7 +5,12 @@ import { ValidationPipe } from '@nestjs/common';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.enableCors({ origin: 'http://localhost:4200', credentials: true });
+
+  app.enableCors({ 
+    origin: 'http://localhost:4200', // TODO. Set this from environment
+    credentials: true 
+  });
+
   app.useGlobalPipes(new ValidationPipe({
     whitelist: true,
     forbidNonWhitelisted: true,
@@ -14,20 +19,22 @@ async function bootstrap() {
       enableImplicitConversion: true,
     },
   }));
+
   app.use(
     session({
       name: 'ssid',
-      secret: 'my-secret',
+      secret: 'climsoft-secret',// TODO. Set this from environment
       resave: false,
       saveUninitialized: false,
       cookie: {
         maxAge: 1000 * 60 * 60 * 24, // set to 24 hours
         sameSite: false,
-        secure: false //TODO change this to true in production,
+        secure: false //TODO set to true only when using HTTPS
       },
     }),
   );
 
   await app.listen(3000);
 }
+
 bootstrap();

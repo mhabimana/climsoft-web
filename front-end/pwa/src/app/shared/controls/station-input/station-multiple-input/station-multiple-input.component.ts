@@ -1,8 +1,8 @@
 import { Component, OnInit, Input, Output, EventEmitter, SimpleChanges, OnChanges } from '@angular/core';
-import { ElementModel } from 'src/app/core/models/element.model';
-import { StationModel } from 'src/app/core/models/station.model';
-import { ElementsService } from 'src/app/core/services/elements.service';
-import { StationsService } from 'src/app/core/services/stations.service';
+import { take } from 'rxjs';
+import { CreateStationModel } from 'src/app/core/models/stations/create-station.model';
+import { ViewStationModel } from 'src/app/core/models/stations/view-station.model';
+import { StationsService } from 'src/app/core/services/stations/stations.service';
 
 @Component({
   selector: 'app-station-multiple-input',
@@ -11,14 +11,14 @@ import { StationsService } from 'src/app/core/services/stations.service';
 })
 export class StationMultipleInputComponent implements OnInit, OnChanges {
   @Input() public label: string = 'Station';
-  @Input() public placeholder: string | null = null;
+  @Input() public placeholder!: string ;
   @Input() public errorMessage: string = '';
   @Input() public includeOnlyIds: string[] = [];
   @Input() public selectedIds: string[] = [];
   @Output() public selectedIdsChange = new EventEmitter<string[]>();
 
-  protected options!: StationModel[];
-  protected selectedOptions: StationModel[] = [];
+  protected options!: ViewStationModel[];
+  protected selectedOptions: ViewStationModel[] = [];
 
   constructor(private stationsSevice: StationsService) {
 
@@ -34,8 +34,14 @@ export class StationMultipleInputComponent implements OnInit, OnChanges {
 
     //load the elements once
     if (!this.options || this.includeOnlyIds.length > 0) {
-      this.stationsSevice.getStations(this.includeOnlyIds).subscribe(data => {
-        this.options = data;
+      this.stationsSevice.find().pipe(take(1)).subscribe(data => {
+
+        if(this.includeOnlyIds.length > 0){
+          this.options = data.filter(item => (this.includeOnlyIds.includes(item.id))) ;
+        }else{
+          this.options = data;
+        }
+       
         this.setInputSelectedOptions();
       });
     }
@@ -50,11 +56,11 @@ export class StationMultipleInputComponent implements OnInit, OnChanges {
     }
   }
 
-  protected optionDisplayFunction(option: StationModel): string {
+  protected optionDisplayFunction(option: CreateStationModel): string {
     return option.name;
   }
 
-  protected onSelectedOptionsChange(selectedOptions: StationModel[]) {
+  protected onSelectedOptionsChange(selectedOptions: CreateStationModel[]) {
 
     this.selectedIds.length = 0;
     for (const option of selectedOptions) {

@@ -6,13 +6,32 @@ import { Component, Input, Output, EventEmitter, OnChanges, SimpleChanges } from
   styleUrls: ['./selector-single-input.component.scss']
 })
 export class SelectorSingleInputComponent<T> implements OnChanges {
-  @Input() public label: string = '';
-  @Input() public placeholder: string | null = null;
-  @Input() public errorMessage: string = '';
-  @Input() public options: T[] = [];
-  @Input() public optionDisplayFn: (option: T) => string = (option => String(option));
-  @Input() public selectedOption!: T | null;
-  @Output() public selectedOptionChange = new EventEmitter<T | null>();
+  @Input() 
+  public id!: string|number;
+  
+  @Input() 
+  public label!: string;
+  
+  @Input() 
+  public placeholder!: string ;
+
+  @Input()
+  public includeCancelOption: boolean = true;
+  
+  @Input() 
+  public errorMessage: string = '';
+  
+  @Input() 
+  public options: T[] = [];
+  
+  @Input() 
+  public optionDisplayFn: (option: T) => string = (option => String(option));
+  
+  @Input() 
+  public selectedOption!: T | null;
+  
+  @Output() 
+  public selectedOptionChange = new EventEmitter<T | null>();
 
   protected filteredValues!: T[];
 
@@ -30,7 +49,7 @@ export class SelectorSingleInputComponent<T> implements OnChanges {
   }
 
   protected onInputChange(inputValue: string): void {
-    console.log("inputvalue", inputValue)
+    //console.log("inputvalue", inputValue)
     if (!inputValue) {
       this.filteredValues = this.options;
       //this.selectedOption = null; //TODO. Is this needed?
