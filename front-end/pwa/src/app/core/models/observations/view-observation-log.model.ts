@@ -2,9 +2,9 @@ import { FlagEnum } from "./flag.enum";
 
 export interface ViewObservationLogModel {
     value: number | null;
-    flag: FlagEnum | null;
-    final: boolean;
+    flag: string| null;
     comment: string | null;
     deleted: boolean;
+    entryUserEmail: string;
     entryDateTime: string;
 }

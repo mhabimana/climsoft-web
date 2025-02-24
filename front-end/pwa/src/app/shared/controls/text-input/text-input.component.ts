@@ -1,41 +1,57 @@
-import { Component, OnInit, Input, Output, EventEmitter, SimpleChanges, OnChanges } from '@angular/core';
+import { Component, OnInit, Input, Output, EventEmitter, ViewChild, ElementRef } from '@angular/core';
 
 @Component({
   selector: 'app-text-input',
   templateUrl: './text-input.component.html',
   styleUrls: ['./text-input.component.scss']
 })
-export class TextInputComponent implements OnChanges {
-  // TODO. Combine these 3 properties into a 'drop down definition'
-  @Input() public includeDropDownOption: boolean = false;
-  @Input() public dropDownOptionMaxHeight: number = 200;
-  @Input() public includeCancelOption: boolean = false;
+export class TextInputComponent {
+  @ViewChild('appHtmlInput') inputElRef!: ElementRef;
 
-  @Input() public type: string = "text";
+  @Input() public displayDropDownOption: boolean = false;
+  @Input() public dropDownOptionMaxHeight: number = 200;
+  @Output() public displayDropDownOptionClick = new EventEmitter<void>();
+
+
+  @Input() public displayExtraInfoOption: boolean = false;
+  @Output() public displayExtraInfoOptionClick = new EventEmitter<void>();
+
+  @Input() public displaySearchOption: boolean = false;
+  @Output() public displaySearchOptionClick = new EventEmitter<void>();
+
+  @Input() public displayCancelOption: boolean = false;
+  @Output() public displayCancelOptionClick = new EventEmitter<void>();
+
+  @Input() public type: string = 'text';
   @Input() public id!: string | number;
   @Input() public label!: string;
   @Input() public placeholder!: string;
+  @Input() public borderSize: number = 1;
   @Input() public disabled: boolean = false;
   @Input() public readonly: boolean = false;
   @Input() public showChanges: boolean = false;
-  @Input() public hintMessage: string = "";
-  @Input() public errorMessage: string | null = "";
-  @Input() public value: string | number | null = "";
+  @Input() public hintMessage: string | null | undefined; // TODO. Null not needed
+  @Input() public errorMessage: string | null | undefined; // TODO. Null not needed
+  @Input() public warningMessage: string | undefined;
+  @Input() public value: string | number | null = '';
+  @Input() public simulateTabOnEnter: boolean = true;
+
   @Output() public valueChange = new EventEmitter<string>();
   @Output() public inputClick = new EventEmitter<string>();
   @Output() public inputEnterKeyPress = new EventEmitter<string>();
   @Output() public inputBlur = new EventEmitter<string>();
-  @Output() public dropDownOptionClick = new EventEmitter<void>();
 
 
-  // For Year-month and date control
-  @Input() public max: string | number | null = null;
+  // For Year-month, date and number controls control
+  @Input() public max: string | number| undefined ;
 
+  @Input() public min: string | number | undefined;
 
-  //protected userChange: boolean = false;
   protected displayDropDown: boolean = false;
 
-  ngOnChanges(changes: SimpleChanges): void {
+
+  public focus(): void {
+    this.inputElRef.nativeElement.focus();
   }
 
   public showDropDown(showDropDrown: boolean) {
@@ -48,6 +64,9 @@ export class TextInputComponent implements OnChanges {
   }
 
   protected onInputClick(): void {
+    if (this.displayDropDownOption) {
+      this.displayDropDown = true;
+    }
     this.inputClick.emit(this.value ? this.value.toString() : '');
   }
 
@@ -61,16 +80,25 @@ export class TextInputComponent implements OnChanges {
 
   protected onCancelOptionClick(): void {
     this.onValueChange('');
+    this.displayCancelOptionClick.emit()
   }
 
   protected onDropDownButtonClick(): void {
     this.showDropDown(!this.displayDropDown);
-    this.dropDownOptionClick.emit();
+    this.displayDropDownOptionClick.emit();
   }
 
   // Called by a directive
   protected closeDropdown(): void {
     this.showDropDown(false);
+  }
+
+  protected onDisplayExtraInfoClick(): void {
+    this.displayExtraInfoOptionClick.emit();
+  }
+
+  protected onDisplaySearchClick(): void {
+    this.displaySearchOptionClick.emit();
   }
 
 }

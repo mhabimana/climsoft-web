@@ -3,26 +3,24 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ObservationModule } from './observation/observation.module';
-import { FileController } from './file.controller';
 import { MetadataModule } from './metadata/metadata.module';
 import { UserModule } from './user/user.module';
 import { SettingsModule } from './settings/settings.module';
 import { MigrationsModule } from './migrations/migrations.module';
-import { SharedModule } from './shared/shared.module';
 
 @Module({
   imports: [
-    SharedModule,
     UserModule,
     MetadataModule,
     ObservationModule,
     SettingsModule,
     MigrationsModule,
+    MetadataModule,
     TypeOrmModule.forRoot({
       type: "postgres",
       host: process.env.DB_HOST ? process.env.DB_HOST : "localhost",
       port: process.env.DB_PORT ? +process.env.DB_PORT : 5432,
-      username: process.env.DB_USERNAME ? process.env.DB_USERNAME : "my_user",
+      username: process.env.DB_USERNAME ? process.env.DB_USERNAME : "postgres",
       password: process.env.DB_PASSWORD ? process.env.DB_PASSWORD : "my_password",
       database: process.env.DB_NAME ? process.env.DB_NAME : "climsoft",
       autoLoadEntities: true, // models will be loaded automatically
@@ -31,7 +29,7 @@ import { SharedModule } from './shared/shared.module';
     }),
 
   ],
-  controllers: [AppController, FileController],
+  controllers: [AppController],
   providers: [AppService],
 })
 export class AppModule {

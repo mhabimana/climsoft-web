@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, FileTypeValidator, Get, MaxFileSizeValidator, Param, ParseArrayPipe, ParseFilePipe, ParseIntPipe, Patch, Post, Put, Query, Req, UploadedFile, UseInterceptors, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Body, Controller, Delete, FileTypeValidator, Get, MaxFileSizeValidator, Param, ParseArrayPipe, ParseFilePipe, ParseIntPipe, Patch, Post, Put, Query, Req, UploadedFile, UseInterceptors } from '@nestjs/common';
 import { ObservationsService } from '../services/observations.service';
 import { CreateObservationDto } from '../dtos/create-observation.dto';
 import { ViewObservationQueryDTO } from '../dtos/view-observation-query.dto';
@@ -7,7 +7,7 @@ import { ObservationImportService } from '../services/observation-import.service
 import { AuthorisedStationsPipe } from 'src/user/pipes/authorised-stations.pipe';
 import { Request } from 'express';
 import { AuthUtil } from 'src/user/services/auth.util';
-import { CreateObservationQueryDto } from '../dtos/create-observation-query.dto';
+import { EntryFormObservationQueryDto } from '../dtos/entry-form-observation-query.dto';
 import { ViewObservationLogQueryDto } from '../dtos/view-observation-log-query.dto';
 import { DeleteObservationDto } from '../dtos/delete-observation.dto';
 import { Admin } from 'src/user/decorators/admin.decorator';
@@ -15,8 +15,8 @@ import { Admin } from 'src/user/decorators/admin.decorator';
 @Controller('observations')
 export class ObservationsController {
   constructor(
-    private readonly observationsService: ObservationsService,
-    private readonly observationUpload: ObservationImportService) { }
+    private observationsService: ObservationsService,
+    private observationUpload: ObservationImportService,) { }
 
   @Get()
   getProcessed(@Query(AuthorisedStationsPipe) viewObsevationQuery: ViewObservationQueryDTO) {
@@ -28,8 +28,13 @@ export class ObservationsController {
     return this.observationsService.count(viewObsevationQuery);
   }
 
+  @Get('count-v4-unsaved-observations')
+  countObservationsNotSavedToV4() {
+    return this.observationsService.countObservationsNotSavedToV4();
+  }
+
   @Get('raw')
-  getRaw(@Query(AuthorisedStationsPipe) createObsevationQuery: CreateObservationQueryDto) {
+  getRaw(@Query(AuthorisedStationsPipe) createObsevationQuery: EntryFormObservationQueryDto) {
     return this.observationsService.findRawObs(createObsevationQuery);
   }
 
@@ -39,11 +44,11 @@ export class ObservationsController {
   }
 
   @Put()
-  async save(
+  async bulkPut(
     @Req() request: Request,
     @Body(AuthorisedStationsPipe, new ParseArrayPipe({ items: CreateObservationDto })) observationDtos: CreateObservationDto[]) {
     const user = AuthUtil.getLoggedInUser(request);
-    await this.observationsService.save(observationDtos, user.id, user.username);
+    await this.observationsService.bulkPut(observationDtos, user.id);
     return { message: "success" };
   }
 
@@ -93,7 +98,6 @@ export class ObservationsController {
     }
 
   }
-
 
   @Patch('restore')
   async restore(

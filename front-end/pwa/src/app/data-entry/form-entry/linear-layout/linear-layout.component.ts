@@ -1,8 +1,11 @@
-import { Component, Input, OnChanges, SimpleChanges, Output, EventEmitter } from '@angular/core';
+import { Component, Input, OnChanges, SimpleChanges, Output, EventEmitter, QueryList, ViewChildren, ViewChild } from '@angular/core';
 import { ViewPortSize, ViewportService } from 'src/app/core/services/view-port.service';
 import { FormEntryDefinition } from '../defintions/form-entry.definition';
 import { FieldEntryDefinition } from '../defintions/field.definition';
 import { ObservationDefinition } from '../defintions/observation.definition';
+import { UserFormSettingStruct } from '../user-form-settings/user-form-settings.component';
+import { ValueFlagInputComponent } from '../value-flag-input/value-flag-input.component';
+import { NumberInputComponent } from 'src/app/shared/controls/number-input/number-input.component';
 
 @Component({
   selector: 'app-linear-layout',
@@ -10,6 +13,12 @@ import { ObservationDefinition } from '../defintions/observation.definition';
   styleUrls: ['./linear-layout.component.scss']
 })
 export class LnearLayoutComponent implements OnChanges {
+  @ViewChildren(ValueFlagInputComponent) vfComponents!: QueryList<ValueFlagInputComponent>;
+  @ViewChild('appTotal') totalComponent!: NumberInputComponent;
+
+  @Input()
+  public userFormSettings!: UserFormSettingStruct;
+
   @Input()
   public formDefinitions!: FormEntryDefinition;
 
@@ -17,11 +26,11 @@ export class LnearLayoutComponent implements OnChanges {
   public refreshLayout!: boolean;
 
   @Input()
-  public displayHistoryOption!: boolean;
+  public displayExtraInfoOption!: boolean;
 
   /** Emitted when observation value is changed */
   @Output()
-  public valueChange = new EventEmitter<ObservationDefinition>();
+  public userInputVF = new EventEmitter<ObservationDefinition>();
 
   /** Emitted when observation value or total value is changed */
   @Output()
@@ -54,6 +63,9 @@ export class LnearLayoutComponent implements OnChanges {
       this.fieldDefinitions = this.formDefinitions.getEntryFieldDefs(this.formDefinitions.formMetadata.fields[0]);
       this.fieldDefinitionsChunks = this.getFieldDefsChunks(this.fieldDefinitions);
       this.observationsDefinitions = this.formDefinitions.obsDefsForLinearLayout;
+    } else if (changes["userFormSettings"] && this.fieldDefinitions) {
+      // Setting change could be related to maximum rows so reinitialise the chunks
+      this.fieldDefinitionsChunks = this.getFieldDefsChunks(this.fieldDefinitions);
     }
   }
 
@@ -64,7 +76,7 @@ export class LnearLayoutComponent implements OnChanges {
    */
   private getFieldDefsChunks(fieldDefs: FieldEntryDefinition[]): FieldEntryDefinition[][] {
     const chunks: FieldEntryDefinition[][] = [];
-    const chunkSize: number = 5;
+    const chunkSize: number = this.userFormSettings.linearLayoutSettings.maxRows;
     for (let i = 0; i < fieldDefs.length; i += chunkSize) {
       chunks.push(fieldDefs.slice(i, i + chunkSize));
     }
@@ -72,12 +84,22 @@ export class LnearLayoutComponent implements OnChanges {
   }
 
   /**
-   * Gets the observation definition of the specified entry field definition. 
+  * Gets the observation definition of the specified entry field definition. 
+  * Used when using the fieldDefinitionsChunks
+  * @param fieldDef 
+  * @returns 
+  */
+  protected getObservationDefByFieldDef(fieldDef: FieldEntryDefinition): ObservationDefinition {
+    const index = this.fieldDefinitions.findIndex(item => item === fieldDef);
+    return this.observationsDefinitions[index];
+  }
+
+  /**
+   * Gets the observation definition of the specified by indexn. 
    * @param fieldDef 
    * @returns 
    */
-  protected getObservationDef(fieldDef: FieldEntryDefinition): ObservationDefinition {
-    const index: number = this.fieldDefinitions.findIndex(data => (data === fieldDef));
+  protected getObservationDefByIndex(index: number): ObservationDefinition {
     return this.observationsDefinitions[index];
   }
 
@@ -85,8 +107,8 @@ export class LnearLayoutComponent implements OnChanges {
    * Handles observation value changes
    * Clears any total error message  
    */
-  protected onValueChange(observationDef: ObservationDefinition): void {
-    this.valueChange.emit(observationDef);
+  protected onUserInputVF(observationDef: ObservationDefinition): void {
+    this.userInputVF.emit(observationDef);
 
     // Only emit total validity if the definition metadata requires it
     if (this.formDefinitions.formMetadata.requireTotalInput) {
@@ -109,6 +131,18 @@ export class LnearLayoutComponent implements OnChanges {
 
     // If no error, then emit true. If error detected emit false
     this.totalIsValid.emit(this.totalErrorMessage === '');
+  }
+
+  public clear(): void {
+    this.vfComponents.forEach(component => {
+      component.clear();
+    })
+  }
+
+  public sameInput(valueFlag: string, comment: string | null): void {
+    this.vfComponents.forEach(component => {
+      component.onSameValueInput(valueFlag, comment);
+    })
   }
 
 

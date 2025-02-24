@@ -1,37 +1,39 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
-import { ViewElementModel } from '../../models/elements/view-element.model';
-import { UpdateElementModel } from '../../models/elements/update-element.model';
-import { CreateElementModel } from '../../models/elements/create-element.model';
-import { BaseNumberAPIService } from '../base/base-number-api.service';
+import { CreateViewElementModel } from '../../../metadata/elements/models/create-view-element.model';
+import { UpdateElementModel } from '../../../metadata/elements/models/update-element.model';
 import { catchError, Observable, throwError } from 'rxjs';
-import { environment } from 'src/environments/environment';
 import { ViewElementQueryModel } from '../../models/elements/view-element-query.model';
 import { StringUtils } from 'src/app/shared/utils/string.utils';
+import { AppConfigService } from 'src/app/app-config.service';
+
+// TODO. Delete this later
 
 @Injectable({
   providedIn: 'root'
 })
-export class ElementsService  {
+export class ElementsService {
 
-  private endPointUrl: string = `${environment.apiUrl}/elements`;
+  private endPointUrl: string;
 
-  constructor(private http: HttpClient) {  }
+  constructor(private appConfigService: AppConfigService, private http: HttpClient) {
+    this.endPointUrl = `${this.appConfigService.apiBaseUrl}/elements`;
+  }
 
-  public findOne(id: number): Observable<ViewElementModel> {
+  public findOne(id: number): Observable<CreateViewElementModel> {
     const url = `${this.endPointUrl}/id/${id}`;
-    return this.http.get<ViewElementModel>(url)
+    return this.http.get<CreateViewElementModel>(url)
       .pipe(
         catchError(this.handleError)
       );
   }
 
-  public find(viewQuery?: ViewElementQueryModel): Observable<ViewElementModel[]> {
+  public find(viewQuery?: ViewElementQueryModel): Observable<CreateViewElementModel[]> {
     let httpParams: HttpParams = new HttpParams();
     if (viewQuery) {
-      httpParams = StringUtils.getQueryParams<ViewElementQueryModel>(viewQuery)
+      httpParams = StringUtils.getQueryParams<ViewElementQueryModel>(viewQuery);
     }
-    return this.http.get<ViewElementModel[]>(`${this.endPointUrl}`, { params: httpParams })
+    return this.http.get<CreateViewElementModel[]>(`${this.endPointUrl}`, { params: httpParams })
       .pipe(
         catchError(this.handleError)
       );
@@ -44,28 +46,28 @@ export class ElementsService  {
       );
   }
 
-  
-  public create(createDto: CreateElementModel): Observable<ViewElementModel> {
-    return this.http.post<ViewElementModel>(`${this.endPointUrl}`, createDto)
+
+  public create(createDto: CreateViewElementModel): Observable<CreateViewElementModel> {
+    return this.http.post<CreateViewElementModel>(`${this.endPointUrl}`, createDto)
       .pipe(
         catchError(this.handleError)
       );
   }
 
-  public update(id: number , updateDto: UpdateElementModel): Observable<ViewElementModel> {
-    return this.http.patch<ViewElementModel>(`${this.endPointUrl}/${id}`, updateDto)
+  public update(id: number, updateDto: UpdateElementModel): Observable<CreateViewElementModel> {
+    return this.http.patch<CreateViewElementModel>(`${this.endPointUrl}/${id}`, updateDto)
       .pipe(
         catchError(this.handleError)
       );
   }
 
-  public delete(id: number): Observable<number> { 
+  public delete(id: number): Observable<number> {
     return this.http.delete<number>(`${this.endPointUrl}/${id}`)
       .pipe(
         catchError(this.handleError)
       );
   }
- 
+
   private handleError(error: HttpErrorResponse) {
 
     if (error.status === 0) {

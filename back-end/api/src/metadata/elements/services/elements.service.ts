@@ -1,34 +1,24 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindManyOptions, FindOptionsWhere, In, Repository } from 'typeorm';
-import { ElementEntity, ElementLogVo } from '../../elements/entities/element.entity';
-import { ObjectUtils } from 'src/shared/utils/object.util';
-import { ElementSubdomainEntity } from '../../elements/entities/element-subdomain.entity';
-import { ElementTypeEntity } from '../../elements/entities/element-type.entity';
-import { ViewElementTypeDto } from '../dtos/elements/view-element-type.dto';
-import { StringUtils } from 'src/shared/utils/string.utils';
-import { IBaseNumberService } from 'src/shared/services/base-number-service.interface.';
-import { ViewElementDto } from '../dtos/elements/view-element.dto';
-import { CreateElementDto } from '../dtos/elements/create-element.dto';
+import { FindManyOptions, FindOptionsWhere, In, MoreThan, Repository } from 'typeorm';
+import { ElementEntity } from '../../elements/entities/element.entity';
+import { CreateViewElementDto } from '../dtos/elements/create-view-element.dto';
 import { UpdateElementDto } from '../dtos/elements/update-element.dto';
 import { ViewElementQueryDTO } from '../dtos/elements/view-element-query.dto';
+import { MetadataUpdatesQueryDto } from 'src/metadata/metadata-updates/dtos/metadata-updates-query.dto';
+import { MetadataUpdatesDto } from 'src/metadata/metadata-updates/dtos/metadata-updates.dto';
 
 @Injectable()
 export class ElementsService {
     constructor(
-        @InjectRepository(ElementEntity) private readonly elementRepo: Repository<ElementEntity>,
-        @InjectRepository(ElementSubdomainEntity) private readonly elementSubdomainRepo: Repository<ElementSubdomainEntity>,
-        @InjectRepository(ElementTypeEntity) private readonly elementTypeRepo: Repository<ElementTypeEntity>,
-    ) {
+        @InjectRepository(ElementEntity) private elementRepo: Repository<ElementEntity>,
+    ) { }
 
-    }
-
-    public async findOne(id: number): Promise<ViewElementDto> {
+    public async findOne(id: number): Promise<CreateViewElementDto> {
         return this.createViewDto(await this.getEntity(id));
     }
 
-
-    public async find(viewElementQueryDto?: ViewElementQueryDTO): Promise<ViewElementDto[]> {
+    public async find(viewElementQueryDto?: ViewElementQueryDTO): Promise<CreateViewElementDto[]> {
         const findOptions: FindManyOptions<ElementEntity> = {
             order: {
                 id: "ASC"
@@ -67,7 +57,7 @@ export class ElementsService {
         return whereOptions
     }
 
-    public async create(createDto: CreateElementDto, userId: number): Promise<ViewElementDto> {
+    public async add(createDto: CreateViewElementDto, userId: number): Promise<CreateViewElementDto> {
 
         let entity: ElementEntity | null = await this.elementRepo.findOneBy({
             id: createDto.id,
@@ -81,7 +71,7 @@ export class ElementsService {
             id: createDto.id,
         });
 
-        this.updateElementEntity(entity, createDto, userId, true);
+        this.updateEntity(entity, createDto, userId);
 
         await this.elementRepo.save(entity);
 
@@ -90,17 +80,12 @@ export class ElementsService {
 
     }
 
-    public async update(id: number, updateDto: UpdateElementDto, userId: number): Promise<ViewElementDto> {
+    public async update(id: number, updateDto: UpdateElementDto, userId: number): Promise<CreateViewElementDto> {
         const entity: ElementEntity = await this.getEntity(id);
-        const oldChanges: ElementLogVo = this.getElementLogFromEntity(entity);
-        const newChanges: ElementLogVo = this.getElementLogFromDto(updateDto, userId);
 
-        //if no changes, then no need to save
-        if (!ObjectUtils.areObjectsEqual<ElementLogVo>(oldChanges, newChanges, ["entryUserId", "entryDateTime"])) {
-            this.updateElementEntity(entity, updateDto, userId, false);
+        this.updateEntity(entity, updateDto, userId);
 
-            await this.elementRepo.save(entity);
-        }
+        await this.elementRepo.save(entity);
 
         return this.createViewDto(entity);
     }
@@ -110,48 +95,66 @@ export class ElementsService {
         return id;
     }
 
-    private getElementLogFromEntity(entity: ElementEntity): ElementLogVo {
-        return {
-            abbreviation: entity.abbreviation,
-            name: entity.name,
-            description: entity.description,
-            units: entity.units,
-            typeId: entity.typeId,
-            entryScaleFactor: entity.entryScaleFactor,
-            comment: entity.comment,
-            entryUserId: entity.entryUserId,
-            entryDateTime: entity.entryDateTime.toISOString()
-        };
+    public async bulkPut(dtos: CreateViewElementDto[], userId: number) {
+        const entities: ElementEntity[] = [];
+        for (const dto of dtos) {
+            const entity: ElementEntity = await this.elementRepo.create({
+                id: dto.id,
+            });
+
+            this.updateEntity(entity, dto, userId);
+            entities.push(entity);
+        }
+
+        const batchSize = 1000; // batch size of 1000 seems to be safer (incase there are comments) and faster.
+        for (let i = 0; i < entities.length; i += batchSize) {
+            const batch = entities.slice(i, i + batchSize);
+            await this.insertOrUpdateValues(batch);
+        }
     }
 
-    private getElementLogFromDto(dto: UpdateElementDto, userId: number): ElementLogVo {
-        return {
-            abbreviation: dto.abbreviation,
-            name: dto.name,
-            description: dto.description,
-            units: dto.units,
-            typeId: dto.typeId,
-            entryScaleFactor: dto.entryScaleFactor,
-            comment: dto.comment,
-            entryUserId: userId,
-            entryDateTime: new Date().toISOString()
-        };
+    private async insertOrUpdateValues(entities: ElementEntity[]): Promise<void> {
+        await this.elementRepo
+            .createQueryBuilder()
+            .insert()
+            .into(ElementEntity)
+            .values(entities)
+            .orUpdate(
+                [
+                    "abbreviation",
+                    "name",
+                    "description",
+                    "units",
+                    "type_id",
+                    "entry_scale_factor",
+                    "comment",
+                    "entry_user_id",
+                ],
+                ["id"],
+                {
+                    skipUpdateIfNoValuesChanged: true,
+                }
+            )
+            .execute();
     }
 
-    private updateElementEntity(entity: ElementEntity, dto: UpdateElementDto, userId: number, newEntity: boolean): void {
-        // Note, log has to be set before updating the new values to the entity, because we are logging previous values.
-        entity.log = newEntity ? null : ObjectUtils.getNewLog<ElementLogVo>(entity.log, this.getElementLogFromEntity(entity));
+    public async deleteAll(): Promise<boolean> {
+        const entities: ElementEntity[] = await this.elementRepo.find();
+        // Note, don't use .clear() because truncating a table referenced in a foreign key constraint is not supported
+        await this.elementRepo.remove(entities);
+        return true;
+    }
 
+    private updateEntity(entity: ElementEntity, dto: UpdateElementDto, userId: number): void {
         entity.abbreviation = dto.abbreviation;
         entity.name = dto.name;
-        entity.description = dto.description;
+        entity.description = dto.description ? dto.description : null;
         entity.units = dto.units;
         entity.typeId = dto.typeId;
-        entity.entryScaleFactor = dto.entryScaleFactor;
-        entity.comment = dto.comment;
+        entity.entryScaleFactor = dto.entryScaleFactor ? dto.entryScaleFactor : null;
+        entity.comment = dto.comment ? dto.comment : null;
+        entity.totalEntryRequired = dto.totalEntryRequired ? dto.totalEntryRequired : null;
         entity.entryUserId = userId;
-        entity.entryDateTime = new Date();
-
     }
 
 
@@ -171,61 +174,47 @@ export class ElementsService {
         return elementEntity;
     }
 
-    private createViewDto(entity: ElementEntity): ViewElementDto {
+    private createViewDto(entity: ElementEntity): CreateViewElementDto {
         return {
             id: entity.id,
             abbreviation: entity.abbreviation,
             name: entity.name,
             description: entity.description,
             units: entity.units,
-            typeId: entity.elementType.id,
-            typeName: entity.elementType.name,
-            subdomainName: entity.elementType.elementSubdomain.name,
-            domain: entity.elementType.elementSubdomain.domain,
+            typeId: entity.typeId,
             entryScaleFactor: entity.entryScaleFactor,
             comment: entity.comment,
+            totalEntryRequired: entity.totalEntryRequired,
         }
     }
 
+    public async checkUpdates(updatesQueryDto: MetadataUpdatesQueryDto): Promise<MetadataUpdatesDto> {
+        let changesDetected: boolean = false;
 
-    // TODO. Move this to its own subdomain
-    public async findElementSubdomains(): Promise<ElementSubdomainEntity[]> {
-        const findOptions: FindManyOptions<ElementSubdomainEntity> = {
-            order: { id: "ASC" }
-        };
+        const serverCount = await this.elementRepo.count();
 
-        // if (domain) {
-        //     findOptions.where = { domain: domain };
-        // }
+        if (serverCount !== updatesQueryDto.lastModifiedCount) {
+            // If number of records in server are not the same as those in the client then changes detected
+            changesDetected = true;
+        } else {
+            const whereOptions: FindOptionsWhere<ElementEntity> = {};
 
-        return this.elementSubdomainRepo.find(findOptions);
-    }
+            if (updatesQueryDto.lastModifiedDate) {
+                whereOptions.entryDateTime = MoreThan(new Date(updatesQueryDto.lastModifiedDate));
+            }
 
-    // Move this to its own subdomain
-    public async findElementTypes(ids?: number[]): Promise<ViewElementTypeDto[]> {
-        const findOptions: FindManyOptions<ElementTypeEntity> = {
-            order: { id: "ASC" }
-        };
-
-        if (ids && ids.length > 0) {
-            findOptions.where = { id: In(ids) };
+            // If there was any changed record then changes detected
+            changesDetected = (await this.elementRepo.count({ where: whereOptions })) > 0
         }
 
-        const dtos: ViewElementTypeDto[] = (await this.elementTypeRepo.find(findOptions)).map(item => {
-            return {
-                id: item.id,
-                name: item.name,
-                description: item.description,
-                subdomainName: item.elementSubdomain.name,
-                domainName: StringUtils.capitalizeFirstLetter(item.elementSubdomain.domain),
-            };
-
-        });
-
-        return dtos;
+        if (changesDetected) {
+            // If any changes detected then return all records 
+            const allRecords = await this.find();
+            return { metadataChanged: true, metadataRecords: allRecords }
+        } else {
+            // If no changes detected then indicate no metadata changed
+            return { metadataChanged: false }
+        }
     }
-
-
-
 
 }

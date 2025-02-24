@@ -1,7 +1,6 @@
 import { Controller, Get, Query, ParseArrayPipe, DefaultValuePipe } from '@nestjs/common';
 import { StationObsFocusesService } from '../services/station-obs-focuses.service';
 
-
 @Controller("station-observation-focuses")
 export class StationObsFocusesController {
 

@@ -6,6 +6,7 @@ import { UserModule } from 'src/user/user.module';
 import { SharedModule } from 'src/shared/shared.module';
 import { SettingsModule } from 'src/settings/settings.module';
 import { MetadataModule } from 'src/metadata/metadata.module';
+import { SqlScriptsModule } from 'src/sql-scripts/sql-scripts.module';
 
 @Module({
     imports: [
@@ -16,8 +17,9 @@ import { MetadataModule } from 'src/metadata/metadata.module';
         UserModule,
         MetadataModule,
         SettingsModule,
+        SqlScriptsModule,
     ],
     providers: [MigrationsService],
-    exports: [MigrationsService]
+    exports: [MigrationsService],
 })
 export class MigrationsModule { }

@@ -13,15 +13,23 @@ export class ObservationEntity extends AppBaseEntity {
   @PrimaryColumn({ name: "station_id", type: "varchar" })
   stationId: string;
 
+  @ManyToOne(() => StationEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "station_id" })
+  station: StationEntity;
+
   @PrimaryColumn({ name: "element_id", type: "int" })
   elementId: number;
 
+  @ManyToOne(() => ElementEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "element_id" })
+  element: ElementEntity;
+
   /**
    * Elevation in reference to the station surface. 
-   * Can above or below the station surface depending on the element.
+   * Can be above or below the station surface depending on the element.
    */
   @PrimaryColumn({ name: "elevation", type: "float" })
-  elevation: number;
+  elevation: number; // TODO, should we call this level?
 
   @PrimaryColumn({ name: "date_time", type: "timestamptz" })
   datetime: Date;
@@ -31,6 +39,10 @@ export class ObservationEntity extends AppBaseEntity {
 
   @PrimaryColumn({ name: "source_id", type: "int" })
   sourceId: number;
+
+  @ManyToOne(() => SourceEntity, { onDelete: "RESTRICT" })
+  @JoinColumn({ name: "source_id" })
+  source: SourceEntity;
 
   @Column({ name: "value", type: "float", nullable: true })
   value: number | null;
@@ -45,10 +57,6 @@ export class ObservationEntity extends AppBaseEntity {
   @Column({ name: "qc_test_log", type: "jsonb", nullable: true })
   qcTestLog: QCTestLogVo | null;
 
-  @Column({ name: "final", type: "boolean", default: false })
-  @Index()
-  final: boolean;
-
   @Column({ name: "comment", type: "varchar", nullable: true })
   comment: string | null;
 
@@ -59,28 +67,28 @@ export class ObservationEntity extends AppBaseEntity {
   @Column({ name: "log", type: "jsonb", nullable: true })
   log: UpdateObservationValuesLogVo[] | null;
 
-  // Relationships
+  // After full migration to v5 model, this column will no longer be needed.
+  @Column({ name: "saved_to_v4", type: "boolean", default: false })
+  @Index()
+  savedToV4: boolean; // True when value has been uploaded to v4 database
 
-  @ManyToOne(() => StationEntity, { onDelete: "RESTRICT" })
-  @JoinColumn({ name: "station_id" })
-  station: StationEntity;
-
-  @ManyToOne(() => ElementEntity, { onDelete: "RESTRICT" })
-  @JoinColumn({ name: "element_id" })
-  element: ElementEntity;
-
-  @ManyToOne(() => SourceEntity, { onDelete: "RESTRICT" })
-  @JoinColumn({ name: "source_id" })
-  source: SourceEntity;
 }
 
 //when changing qc, we will use the qc log
 export interface UpdateObservationValuesLogVo extends BaseLogVo {
   value: number | null;
   flag: FlagEnum | null;
-  final: boolean;
   comment: string | null;
   deleted: boolean;
+}
+
+export class ViewObservationLogDto {
+  value: number | null;
+  flag: FlagEnum | null;
+  comment: string | null;
+  deleted: boolean;
+  entryUserEmail: string;
+  entryDateTime: string;
 }
 
 export interface QCTestLogVo {

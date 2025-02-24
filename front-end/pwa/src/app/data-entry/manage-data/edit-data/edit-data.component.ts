@@ -1,19 +1,20 @@
-import { Component } from '@angular/core';
+import { Component, OnDestroy } from '@angular/core';
 import { ViewObservationQueryModel } from 'src/app/core/models/observations/view-observation-query.model';
 import { ViewObservationModel } from 'src/app/core/models/observations/view-observation.model';
-import { ObservationsService } from 'src/app/core/services/observations/observations.service';
-import { PagesDataService } from 'src/app/core/services/pages-data.service';
-import { ElementsService } from 'src/app/core/services/elements/elements.service';
-import { ViewElementModel } from 'src/app/core/models/elements/view-element.model';
-import { take } from 'rxjs';
-import { SourcesService } from 'src/app/core/services/sources/sources.service';
+import { ObservationsService } from 'src/app/data-entry/services/observations.service';
+import { PagesDataService, ToastEventTypeEnum } from 'src/app/core/services/pages-data.service';
+import { Subject, take, takeUntil } from 'rxjs';
 import { ViewSourceModel } from 'src/app/metadata/sources/models/view-source.model';
-import { CreateObservationModel } from 'src/app/core/models/observations/create-observation.model'; 
+import { CreateObservationModel } from 'src/app/core/models/observations/create-observation.model';
 import { DeleteObservationModel } from 'src/app/core/models/observations/delete-observation.model';
 import { Period, PeriodsUtil } from 'src/app/shared/controls/period-input/period-single-input/Periods.util';
 import { ObservationDefinition } from '../../form-entry/defintions/observation.definition';
 import { NumberUtils } from 'src/app/shared/utils/number.utils';
 import { PagingParameters } from 'src/app/shared/controls/page-input/paging-parameters';
+import { SourcesCacheService } from 'src/app/metadata/sources/services/sources-cache.service';
+import { ElementCacheModel, ElementsCacheService } from 'src/app/metadata/elements/services/elements-cache.service';
+import { GeneralSettingsService } from 'src/app/admin/general-settings/services/general-settings.service';
+import { ClimsoftDisplayTimeZoneModel } from 'src/app/admin/general-settings/models/settings/climsoft-display-timezone.model';
 
 interface ObservationEntry {
   obsDef: ObservationDefinition;
@@ -27,7 +28,7 @@ interface ObservationEntry {
   templateUrl: './edit-data.component.html',
   styleUrls: ['./edit-data.component.scss']
 })
-export class EditDataComponent {
+export class EditDataComponent implements OnDestroy {
   protected stationId: string | null = null;
   protected sourceId: number | null = null;
   protected elementId: number | null = null;
@@ -38,7 +39,7 @@ export class EditDataComponent {
   protected hour: number | null = null;
   protected useEntryDate: boolean = false;
   protected observationsEntries: ObservationEntry[] = [];
-  private elementsMetadata: ViewElementModel[] = [];
+  private elementsMetadata: ElementCacheModel[] = [];
   private sourcessMetadata: ViewSourceModel[] = [];
   private periods: Period[] = PeriodsUtil.possiblePeriods;
   protected pageInputDefinition: PagingParameters = new PagingParameters();
@@ -47,22 +48,41 @@ export class EditDataComponent {
   protected enableView: boolean = true;
   protected numOfChanges: number = 0;
   protected allBoundariesIndices: number[] = [];
+  private utcOffset: number = 0;
+
+  private destroy$ = new Subject<void>();
 
   constructor(
     private pagesDataService: PagesDataService,
-    private elementService: ElementsService,
-    private sourcesService: SourcesService,
-    private observationService: ObservationsService
+    private elementService: ElementsCacheService,
+    private sourcesService: SourcesCacheService,
+    private observationService: ObservationsService,
+    private generalSettingsService: GeneralSettingsService,
   ) {
 
-
-    this.elementService.find().pipe(take(1)).subscribe(data => {
+    this.elementService.cachedElements.pipe(
+      takeUntil(this.destroy$),
+    ).subscribe(data => {
       this.elementsMetadata = data;
     });
 
-    this.sourcesService.findAll().pipe(take(1)).subscribe(data => {
+    this.sourcesService.cachedSources.pipe(
+      takeUntil(this.destroy$),
+    ).subscribe(data => {
       this.sourcessMetadata = data;
     });
+
+    // Get the climsoft time zone display setting
+    this.generalSettingsService.findOne(2).pipe(
+      takeUntil(this.destroy$),
+    ).subscribe((data) => {
+      this.utcOffset = (data.parameters as ClimsoftDisplayTimeZoneModel).utcOffset;
+    });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   protected onDateToUseSelection(selection: string): void {
@@ -70,6 +90,7 @@ export class EditDataComponent {
   }
 
   protected onViewClick(): void {
+    console.log('view click')
     // Get the data based on the selection filter
     this.observationFilter = { deleted: false };
 
@@ -100,6 +121,7 @@ export class EditDataComponent {
       this.observationFilter.useEntryDate = true;
     }
 
+    // TODO. Use the display UTC setting
     if (this.fromDate !== null) {
       this.observationFilter.fromDate = `${this.fromDate}T00:00:00Z`;
     }
@@ -176,7 +198,6 @@ export class EditDataComponent {
     }
   }
 
-
   protected includeLowerBoundaryLine(index: number): boolean {
     return this.allBoundariesIndices.includes(index);
   }
@@ -185,8 +206,15 @@ export class EditDataComponent {
     return (observationsDef.observation as ViewObservationModel);
   }
 
-  protected getFormattedDatetime(strDateTime: string): string {
-    return strDateTime.replace('T', ' ').replace('Z', '');
+  protected getFormattedDatetime(strDateTimeInUTC: string): string {
+    // Will subtract the offset to get UTC time if local time is ahead of UTC and add the offset to get UTC time if local time is behind UTC
+    // Note, it's addition and NOT subtraction because this is meant to display the datetime NOT submiting it
+    const dateAdjusted = new Date(strDateTimeInUTC);
+    dateAdjusted.setHours(dateAdjusted.getHours() + this.utcOffset); 
+
+    // TODO. Leaving this loggging here to show Angular change detection effects
+    console.log('Before conversion: ', strDateTimeInUTC, '. After conversion: ',dateAdjusted.toISOString(), '. Offset: ', this.utcOffset );
+    return dateAdjusted.toISOString().replace('T', ' ').replace('Z', '');
   }
 
   protected getPeriodName(minutes: number): string {
@@ -220,7 +248,6 @@ export class EditDataComponent {
     this.updatedObservations();
   }
 
-
   private updatedObservations(): void {
     this.enableSave = false;
     // Create required observation dtos 
@@ -250,17 +277,17 @@ export class EditDataComponent {
     }
 
     // Send to server for saving
-    this.observationService.save(changedObs).subscribe((data) => {
+    this.observationService.bulkPutDataFromEntryForm(changedObs).subscribe((data) => {
       this.enableSave = true;
       if (data) {
         this.pagesDataService.showToast({
-          title: 'Observations', message: `${changedObs.length} observation${changedObs.length === 1 ? '' : 's'} saved`, type: 'success'
+          title: 'Observations', message: `${changedObs.length} observation${changedObs.length === 1 ? '' : 's'} saved`, type: ToastEventTypeEnum.SUCCESS
         });
 
         this.onViewClick();
       } else {
         this.pagesDataService.showToast({
-          title: 'Observations', message: `${changedObs.length} observation${changedObs.length === 1 ? '' : 's'} NOT saved`, type: 'error'
+          title: 'Observations', message: `${changedObs.length} observation${changedObs.length === 1 ? '' : 's'} NOT saved`, type: ToastEventTypeEnum.ERROR
         });
       }
     });
@@ -295,20 +322,20 @@ export class EditDataComponent {
       this.enableSave = true;
       if (data) {
         this.pagesDataService.showToast({
-          title: 'Observations', message: `${deletedObs.length} observation${deletedObs.length === 1 ? '' : 's'} deleted`, type: 'success'
+          title: 'Observations', message: `${deletedObs.length} observation${deletedObs.length === 1 ? '' : 's'} deleted`, type: ToastEventTypeEnum.SUCCESS
         });
 
         this.onViewClick();
       } else {
         this.pagesDataService.showToast({
-          title: 'Observations', message: `${deletedObs.length} observation${deletedObs.length === 1 ? '' : 's'} NOT deleted`, type: 'error'
+          title: 'Observations', message: `${deletedObs.length} observation${deletedObs.length === 1 ? '' : 's'} NOT deleted`, type: ToastEventTypeEnum.ERROR
         });
       }
     });
   }
 
 
-  protected getRowNumber(currentRowIndex: number): number {  
+  protected getRowNumber(currentRowIndex: number): number {
     return NumberUtils.getRowNumber(this.pageInputDefinition.page, this.pageInputDefinition.pageSize, currentRowIndex);
   }
 }

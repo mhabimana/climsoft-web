@@ -2,12 +2,12 @@ import { NgModule } from '@angular/core';
 import { SharedModule } from '../shared/shared.module';
 import { MetadataRoutingModule } from './metadata-routing.module';
 
-import { FormSelectorDialogComponent } from './controls/form-selector-dialog/form-selector-dialog.component';
+import { FormSelectorDialogComponent } from './stations/station-detail/station-forms/form-selector-dialog/form-selector-dialog.component';
 import { ElementsSelectorDialogComponent } from './controls/elements-selector-dialog/elements-selector-dialog.component';
 import { StationElementLimitsInputDialogComponent } from './controls/station-element-limits-input-dialog/station-element-limits-input-dialog.component';
 
 import { ViewRegionsComponent } from './regions/view-regions/view-regions.component';
-import { ImportRegionsComponent } from './regions/import-regions/import-regions.component';
+import { ImportRegionsDialogComponent } from './regions/import-regions-dialog/import-regions-dialog.component';
 import { ViewRegionsMapComponent } from './regions/view-regions/view-regions-map/view-regions-map.component';
 import { ViewRegionsTableComponent } from './regions/view-regions/view-regions-table/view-regions-table.component';
 import { ViewStationsTableComponent } from './stations/view-stations/view-stations-table/view-stations-table.component';
@@ -16,7 +16,7 @@ import { FormSourceDetailComponent } from './sources/form-source-detail/form-sou
 import { ImportSourceDetailComponent } from './sources/import-source-detail/import-source-detail.component';
 import { ViewStationsComponent } from './stations/view-stations/view-stations.component';
 import { StationDetailComponent } from './stations/station-detail/station-detail.component';
-import { StationCharacteristicsEditDialogComponent } from './stations/station-characteristics-edit-dialog/station-characteristics-edit-dialog.component';
+import { StationCharacteristicsEditDialogComponent } from './stations/station-detail/station-characteristics-edit-dialog/station-characteristics-edit-dialog.component';
 import { ImportStationsDialogComponent } from './stations/import-stations-dialog/import-stations-dialog.component';
 import { ElementDetailComponent } from './elements/element-detail/element-detail.component';
 import { ViewElementsComponent } from './elements/view-elements/view-elements.component';
@@ -45,10 +45,12 @@ import { QCTestContextualParamsComponent } from './elements/element-detail/qc-te
 import { QCTestConditionInputComponent } from './elements/element-detail/qc-test-input-dialog/qc-test-condition-input/qc-test-condition-input.component';
 import { ViewStationsMapComponent } from './stations/view-stations/view-stations-map/view-stations-map.component';
 import { StationsSearchDialogComponent } from './stations/stations-search-dialog/stations-search-dialog.component';
-import { StationsSearchComponent } from './stations/stations-search/stations-search.component';
-import { StationsSearchHistoryComponent } from './stations/stations-search/stations-search-history/stations-search-history.component';
-import { StationsSearchByComponent } from './stations/stations-search/stations-search-by/stations-search-by.component';
-import { StationsIdNameSearchComponent } from './stations/stations-search/stations-id-name-search/stations-id-name-search.component';
+import { ImportElementsDialogComponent } from './elements/import-elements-dialog/import-elements-dialog.component';
+import { ElementsSearchDialogComponent } from './elements/elements-search-dialog/elements-search-dialog.component';
+import { ElementSelectorMultipleComponent } from './elements/element-selector/element-selector-multiple/element-selector-multiple.component';
+import { ElementSelectorSingleComponent } from './elements/element-selector/element-selector-single/element-selector-single.component';
+import { StationSelectorSingleComponent } from './stations/station-selector/station-single-input/station-selector-single.component';
+import { StationSelectorMultipleComponent } from './stations/station-selector/station-selector-multiple/station-selector-multiple.component';
 
 @NgModule({
   declarations: [
@@ -63,13 +65,13 @@ import { StationsIdNameSearchComponent } from './stations/stations-search/statio
     ViewStationsComponent,
     StationDetailComponent,
     StationCharacteristicsEditDialogComponent,
-    ImportStationsDialogComponent, 
+    ImportStationsDialogComponent,
 
     ElementDetailComponent,
     ViewElementsComponent,
     StationCharacteristicsComponent,
     StationFormsComponent,
-    StationLimitsComponent, 
+    StationLimitsComponent,
     ImportSourceStationDetailComponent,
     ImportSourceElementAndValueDetailComponent,
     ImportSourcePeriodDetailComponent,
@@ -80,7 +82,8 @@ import { StationsIdNameSearchComponent } from './stations/stations-search/statio
     ImportSourceFlagDetailComponent,
     ElementCharacteristicsInputDialogComponent,
     ElementCharacteristicsComponent,
-    QCTestsComponent, 
+    ImportElementsDialogComponent,
+    QCTestsComponent,
     QCTestInputDialogComponent,
     QCTestTypeInputComponent,
     QCTestRangeThresholdParamsComponent,
@@ -90,30 +93,37 @@ import { StationsIdNameSearchComponent } from './stations/stations-search/statio
     QCTestRelationalParamsComponent,
     QCTestContextualParamsComponent,
     QCTestConditionInputComponent,
-    ImportRegionsComponent,
-    ViewRegionsComponent,   
+    ImportRegionsDialogComponent,
+    ViewRegionsComponent,
     ViewRegionsTableComponent,
     ViewRegionsMapComponent,
     ViewStationsTableComponent,
     ViewStationsMapComponent,
-
     StationsSearchDialogComponent,
-    StationsSearchComponent,
-    StationsSearchHistoryComponent,
-    StationsSearchByComponent,
-    StationsIdNameSearchComponent,
-   
+    
+    ElementsSearchDialogComponent, 
+    ElementSelectorSingleComponent,
+    ElementSelectorMultipleComponent,
+
+    StationSelectorMultipleComponent,
+    StationSelectorSingleComponent,
   ],
   imports: [
-    SharedModule,
-    MetadataRoutingModule
+    MetadataRoutingModule,
+    SharedModule,    
   ],
   exports: [
     ElementsSelectorDialogComponent,
-    FormSelectorDialogComponent,
+    ElementSelectorSingleComponent,
+    ElementSelectorMultipleComponent,
+    ElementsSearchDialogComponent,
+    
+    FormSelectorDialogComponent,   
 
-    StationsSearchDialogComponent,
-    StationsSearchComponent,
+    StationSelectorMultipleComponent,
+    StationSelectorSingleComponent,
+    StationsSearchDialogComponent, 
+    ViewStationsMapComponent,
   ]
 })
 export class MetadataModule { }

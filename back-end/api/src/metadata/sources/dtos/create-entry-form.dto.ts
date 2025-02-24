@@ -21,25 +21,18 @@ export class CreateEntryFormDTO implements SourceParametersValidity {
   layout: LayoutType;
 
   /** Elements ids allowed to be recorded by the form */
-  @Transform(({ value }) => value ? StringUtils.mapCommaSeparatedStringToNumberArray(value.toString()) : [])
+  @Transform(({ value }) => value ? StringUtils.mapCommaSeparatedStringToIntArray(value.toString()) : [])
   @IsInt({ each: true })
   elementIds: number[];
 
   /** Hours allowed to be recorded by the form */
-  @Transform(({ value }) => value ? StringUtils.mapCommaSeparatedStringToNumberArray(value.toString()) : [])
+  @Transform(({ value }) => value ? StringUtils.mapCommaSeparatedStringToIntArray(value.toString()) : [])
   @IsInt({ each: true })
   hours: number[];
 
   /** Period for observation */
   @IsInt()
   period: number;
-
-  /** 
-   * Determines whether to allow entries that don't pass observation limits.
-   * If true, when limits are exceeded, data entry will not be allowed.
-   */
-  @IsBoolean()
-  enforceLimitCheck: boolean;
 
   /**
   * Determines whether user is required to type in observation total or not.

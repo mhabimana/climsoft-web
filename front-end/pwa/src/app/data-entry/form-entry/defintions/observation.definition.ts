@@ -1,11 +1,11 @@
 import { take } from "rxjs";
 import { RangeThresholdQCTestParamsModel } from "src/app/core/models/elements/qc-tests/qc-test-parameters/range-qc-test-params.model";
-import { ViewElementModel } from "src/app/core/models/elements/view-element.model";
+import { CreateViewElementModel } from "src/app/metadata/elements/models/create-view-element.model";
 import { CreateObservationModel } from "src/app/core/models/observations/create-observation.model";
 import { FlagEnum } from "src/app/core/models/observations/flag.enum";
 import { ViewObservationLogQueryModel } from "src/app/core/models/observations/view-observation-log-query.model";
 import { ViewObservationLogModel } from "src/app/core/models/observations/view-observation-log.model";
-import { ObservationsService } from "src/app/core/services/observations/observations.service";
+import { ObservationsService } from "src/app/data-entry/services/observations.service";
 import { DateUtils } from "src/app/shared/utils/date.utils";
 import { NumberUtils } from "src/app/shared/utils/number.utils";
 import { StringUtils } from "src/app/shared/utils/string.utils";
@@ -14,16 +14,21 @@ import { StringUtils } from "src/app/shared/utils/string.utils";
  * Holds the definitions used by the value flag component for data display and entry validations
  */
 export class ObservationDefinition {
-    private elementMetadata: ViewElementModel;
+    private elementMetadata: CreateViewElementModel;
     private _observation: CreateObservationModel;
-    private _valueFlagForDisplay: string = "";
-    private _valueFlagForDisplayDB: string = "";
+
+    /**
+     * holds original value, flag, period and comment  values
+     */
+    private _databaseValues: string = '';
+
+    private _existsInDatabase: boolean = false;
 
     /**
      * Determines whether to invalidate missing value input
      */
     private allowMissingValues: boolean;
- 
+
     /**
      * Determines whether the value input will be scaled or not (using the element entry factor).
      * Also determines whether _valueFlagForDisplay will be ins scaled or unscaled format. 
@@ -42,26 +47,57 @@ export class ObservationDefinition {
     private _validationErrorMessage: string = "";
 
     /**
+   * Holds the validation warning message when value flag is invalid. 
+   */
+    private _validationWarningMessage: string = "";
+
+    /**
      * Determines whether to enforce range threshold checks or not.
      */
     private rangeThreshold: RangeThresholdQCTestParamsModel | undefined;
 
-    constructor(observation: CreateObservationModel, elementMetadata: ViewElementModel, allowMissingValues: boolean , scaleValue: boolean, rangeThreshold: RangeThresholdQCTestParamsModel | undefined) {
+    public valueFlagInput!: string;
+    public originalPeriod: number;
+
+    constructor(observation: CreateObservationModel, elementMetadata: CreateViewElementModel, allowMissingValues: boolean, scaleValue: boolean, rangeThreshold: RangeThresholdQCTestParamsModel | undefined) {
         this._observation = observation;
         this.elementMetadata = elementMetadata;
         this.allowMissingValues = allowMissingValues;
         this.scaleValue = scaleValue;
         this.rangeThreshold = rangeThreshold;
-        this._valueFlagForDisplay = this.getValueFlagForDisplay(this.observation.value, this.observation.flag);
-        this._valueFlagForDisplayDB = this._valueFlagForDisplay;
+
+        this.originalPeriod = observation.period;
+        this.valueFlagInput = this.constructValueFlagForDisplayStr(this.observation.value, this.observation.flag);
+
+        // validate database values
+        this.validateOriginalValue();
+
+        this._existsInDatabase = observation.value !== null || observation.flag !== null;
+        // set original database values for future comparison
+        this._databaseValues = `${this.getvalueFlagForDisplay()}${this.period}${this.comment}`;
+
     }
 
-    public get valueFlagForDisplay(): string {
-        return this._valueFlagForDisplay;
+    private validateOriginalValue(): void {
+        // Validate input format validity. If there is a response then entry is invalid
+        this._validationErrorMessage = this.checkInputFormatValidity(this.getvalueFlagForDisplay())
+        if (!StringUtils.isNullOrEmpty(this._validationErrorMessage)) {
+            return;
+        }
+
+        // If there is a value input then validate
+        if (this.observation.value !== null) {
+            this._validationWarningMessage = this.checkValueLimitsValidity(this.observation.value);
+        }
+
+        // If there is a flag input then validate. Use first letter only
+        if (this.observation.flag !== null) {
+            this._validationErrorMessage = this.checkFlagLetterValidity(this.observation.value, this.observation.flag[0]);
+        }
     }
 
-    public get valueFlagForDisplayDB(): string {
-        return this._valueFlagForDisplayDB;
+    public getvalueFlagForDisplay(): string {
+        return this.constructValueFlagForDisplayStr(this.observation.value, this.observation.flag);;
     }
 
     public get observation(): CreateObservationModel {
@@ -76,21 +112,37 @@ export class ObservationDefinition {
         return this._validationErrorMessage;
     }
 
+    public get validationWarningMessage(): string {
+        return this._validationWarningMessage;
+    }
+
     public get observationChangeIsValid(): boolean {
-        // Both value and flag should not be null, and there should be no validation error messages
-        return !(this.observation.value === null && this.observation.flag === null) && this._validationErrorMessage.length === 0;
+        // There should be no validation error messages
+        return this.validationErrorMessage.length === 0;
     }
 
     public get observationChanged(): boolean {
-        return this._valueFlagForDisplay !== this._valueFlagForDisplayDB;
+        return `${this.getvalueFlagForDisplay()}${this.period}${this.comment}` !== this._databaseValues;
     }
 
     public get comment(): string | null {
         return this.observation.comment;
     }
 
-    public updateCommentInput(comment: string): void {
+    public get period(): number {
+        return this.observation.period;
+    }
+
+    public get existsInDatabase(): boolean {
+        return this._existsInDatabase;
+    }
+
+    public updateCommentInput(comment: string | null): void {
         this.observation.comment = StringUtils.isNullOrEmpty(comment) ? null : comment;
+    }
+
+    public updatePeriodInput(period: number): void {
+        this.observation.period = period;
     }
 
     /**
@@ -100,35 +152,30 @@ export class ObservationDefinition {
      * @param enforceLimitCheck whether to enforce limit check or not
      * @returns empty string if value flag contents are valid, else returns the error message.
      */
-    public updateValueFlagFromUserInput(valueFlagInput: string): void {
-        // clear previous values first
-        this.observation.value = null;
-        this.observation.flag = null;
-        this._valueFlagForDisplay = valueFlagInput;
+    public updateValueFlagFromUserInput(newValueFlagInput: string): void {
+        // Important, trim any white spaces (empty values will always be ignored)
+        this.valueFlagInput = newValueFlagInput.trim();
         this._validationErrorMessage = "";
+        this._validationWarningMessage = "";
 
         // Validate input format validity. If there is a response then entry is invalid
-        this._validationErrorMessage = this.checkInputFormatValidity(valueFlagInput)
+        this._validationErrorMessage = this.checkInputFormatValidity(this.valueFlagInput)
         if (!StringUtils.isNullOrEmpty(this._validationErrorMessage)) {
             return;
         }
 
         // Extract and set the value and flag
-        const extractedScaledValFlag = StringUtils.splitNumbersAndTrailingNonNumericCharactersOnly(valueFlagInput);
+        const extractedScaledValFlag = StringUtils.splitNumbersAndTrailingNonNumericCharactersOnly(this.valueFlagInput);
 
         // Transform the value to actual scale 
-        const value: number | null = extractedScaledValFlag[0] === null ? null : this.getValueBasedOnScaleDefintion(extractedScaledValFlag[0]);
+        const value: number | null = extractedScaledValFlag[0] === null ? null : this.getValueBasedOnScaleDefinition(extractedScaledValFlag[0]);
 
         // Transform the flag letter
         const flagLetter: string | null = extractedScaledValFlag[1] === null ? null : extractedScaledValFlag[1].toUpperCase();
 
         // If there is a value input then validate
         if (value !== null) {
-            this._validationErrorMessage = this.checkValueLimitsValidity(value);
-            if (!StringUtils.isNullOrEmpty(this._validationErrorMessage)) {
-                return;
-            }  
-           
+            this._validationWarningMessage = this.checkValueLimitsValidity(value);
         }
 
         // If there is a flag input then validate
@@ -142,11 +189,10 @@ export class ObservationDefinition {
         // Set the value and flag to the observation model 
         this.observation.value = value;
         this.observation.flag = flagLetter ? this.findFlag(flagLetter) : null;
-        this._validationErrorMessage = "";
-        this._valueFlagForDisplay = this.getValueFlagForDisplay(this.observation.value, this.observation.flag);
+        this.valueFlagInput = this.constructValueFlagForDisplayStr(this.observation.value, this.observation.flag);
     }
 
-    private getValueFlagForDisplay(value: number | null, flag: FlagEnum | null): string {
+    private constructValueFlagForDisplayStr(value: number | null, flag: FlagEnum | null): string {
         const unScaledValue: number | null = this.scaleValue ? this.getUnScaledValue(value) : value;
         const valueStr = unScaledValue === null ? '' : unScaledValue.toString();
         const flagStr = flag === null ? '' : flag[0].toUpperCase();
@@ -160,7 +206,7 @@ export class ObservationDefinition {
      * @param value 
      * @returns 
      */
-    private getValueBasedOnScaleDefintion(value: number): number {
+    private getValueBasedOnScaleDefinition(value: number): number {
         if (!this.scaleValue) {
             return value;
         }
@@ -181,16 +227,6 @@ export class ObservationDefinition {
      * @returns empty string if valid
      */
     private checkInputFormatValidity(valueFlagInput: string): string {
-        // Check for emptiness
-        if (StringUtils.isNullOrEmpty(valueFlagInput, false)) {
-            return this.allowMissingValues ? '' : 'Missing value not allowed';
-        }
-
-        // Check for white spaces.
-        if (StringUtils.isNullOrEmpty(valueFlagInput, true)) {
-            return 'Empty spaces not allowed';
-        }
-
         // Check if it's all string. Applies when its flag M entered.
         if (StringUtils.doesNotContainNumericCharacters(valueFlagInput)) {
             return '';
@@ -216,11 +252,10 @@ export class ObservationDefinition {
      * @returns empty string if value is valid.
      */
     private checkValueLimitsValidity(value: number): string {
-
-         // If no range thresholds given, then return empty, no need for validations
-         if(!this.rangeThreshold){
-             return '';  
-         }
+        // If no range thresholds given, then return empty, no need for validations
+        if (!this.rangeThreshold) {
+            return '';
+        }
 
         const element = this.elementMetadata;
         // Get the scale factor to use. An element may not have a scale factor
@@ -244,7 +279,6 @@ export class ObservationDefinition {
      * @returns empty string if valid
      */
     private checkFlagLetterValidity(value: number | null, flagLetter: string): string {
-
         if (flagLetter.length > 1) {
             return 'Invalid Flag, single letter expected';
         }
@@ -265,8 +299,6 @@ export class ObservationDefinition {
         if (value === null && flagFound !== FlagEnum.MISSING) {
             return 'Invalid Flag, use M flag for missing value';
         }
-
-
 
         return '';
     }

@@ -1,14 +1,14 @@
-import { Location } from '@angular/common';
 import { HttpClient, HttpEventType, HttpParams } from '@angular/common/http';
 import { Component, OnInit } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
-import {  catchError,  take, throwError } from 'rxjs';
+import { catchError, take, throwError } from 'rxjs';
 import { ImportTabularSourceModel } from 'src/app/metadata/sources/models/create-import-source-tabular.model';
 import { CreateImportSourceModel, DataStructureTypeEnum } from 'src/app/metadata/sources/models/create-import-source.model';
 import { ViewSourceModel } from 'src/app/metadata/sources/models/view-source.model';
 import { PagesDataService } from 'src/app/core/services/pages-data.service';
-import { SourcesService } from 'src/app/core/services/sources/sources.service';
 import { environment } from 'src/environments/environment';
+import { SourcesCacheService } from 'src/app/metadata/sources/services/sources-cache.service';
+import { AppConfigService } from 'src/app/app-config.service';
 
 @Component({
   selector: 'app-import-entry',
@@ -28,8 +28,9 @@ export class ImportEntryComponent implements OnInit {
   protected disableUpload: boolean = false;
 
   constructor(
+    private appConfigService: AppConfigService, 
     private pagesDataService: PagesDataService,
-    private importSourcesService: SourcesService,
+    private importSourcesService: SourcesCacheService,
     private http: HttpClient,
     private route: ActivatedRoute) {
   }
@@ -40,9 +41,12 @@ export class ImportEntryComponent implements OnInit {
     this.importSourcesService.findOne(sourceId).pipe(
       take(1)
     ).subscribe((data) => {
+      if (!data) {
+        return;
+      }
       this.viewSource = data;
       this.pagesDataService.setPageHeader('Import Data From ' + this.viewSource.name);
-      const importSource: CreateImportSourceModel =this.viewSource.parameters  as CreateImportSourceModel;
+      const importSource: CreateImportSourceModel = this.viewSource.parameters as CreateImportSourceModel;
 
       if (importSource.dataStructureType === DataStructureTypeEnum.TABULAR) {
         const tabularSource: ImportTabularSourceModel = importSource.dataStructureParameters as ImportTabularSourceModel;
@@ -56,7 +60,7 @@ export class ImportEntryComponent implements OnInit {
     if (fileInputEvent.target.files.length === 0) {
       return;
     }
- 
+
     if (this.showStationSelection && !this.selectedStationId) {
       this.uploadMessage = "Select station";
       this.uploadError = true;
@@ -75,7 +79,7 @@ export class ImportEntryComponent implements OnInit {
     formData.append('file', selectedFile);
 
     const params = new HttpParams();
-    let url = `${environment.apiUrl}/observations/upload/${this.viewSource.id}`;
+    let url = `${this.appConfigService.apiBaseUrl}/observations/upload/${this.viewSource.id}`;
     // If station id is provided, append it as a route parameter
     if (this.showStationSelection && this.selectedStationId) {
       url = url + "/" + this.selectedStationId;

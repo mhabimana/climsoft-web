@@ -1,0 +1,61 @@
+<div *ngIf="viewUser" class="card border-0">
+
+  <div class="card-header d-flex justify-content-between p-0 align-items-center mb-3">
+    <div class="fw-bold">Edit user details</div>
+  </div>
+
+  <div class="card-body p-0">
+
+    <div>
+
+      <div class="mb-3">
+        <app-text-input [label]="'Name'" [(value)]="viewUser.name" />
+      </div>
+
+      <div class="mb-3">
+        <app-text-input [type]="'email'" [label]="'Email'" [(value)]="viewUser.email" />
+      </div>
+
+      <div class="mb-3">
+        <app-text-input [label]="'Phone'" [(value)]="viewUser.phone" />
+      </div>
+
+      <div class="mb-3">
+        <app-user-role-single-input [label]="'Role'" [selectedId]="viewUser.role"
+          (selectedIdChange)="onRoleSelection($event)" />
+      </div>
+
+      <div *ngIf="userRoleIsNotAdmin">
+        <div class="mb-3">
+          <app-station-selector-multiple [label]="'Authorised stations'" [placeholder]="'All stations'"
+            [selectedIds]="viewUser.authorisedStationIds? viewUser.authorisedStationIds: []"
+            (selectedIdsChange)="onStationsSelection($event)" />
+        </div>
+
+        <div class="mb-3">
+          <app-check-box-input [label]="'User can download data'" [(value)]="viewUser.canDownloadData" />
+          <div *ngIf="viewUser.canDownloadData" class="ms-2">
+            <app-element-selector-multiple [label]="'Authorised Elements'" [placeholder]="'All elements'"
+              [selectedIds]="viewUser.authorisedElementIds? viewUser.authorisedElementIds : []"
+              (selectedIdsChange)="onElementsSelection($event)" />
+          </div>
+        </div>
+
+      </div>
+
+      <div class="mb-3">
+        <app-check-box-input [label]="'Disabled'" [(value)]="viewUser.disabled" />
+      </div>
+
+    </div>
+
+  </div>
+
+  <div class="card-footer bg-transparent d-flex justify-content-end px-0 mt-3">
+    <button type="button" class="btn btn-sm btn-outline-primary me-2" (click)="onSaveClick()" [disabled]="!bEnableSave">
+      Save
+    </button>
+    <button type="button" class="btn btn-sm btn-outline-secondary" (click)="onCancelClick()">Cancel</button>
+  </div>
+
+</div>

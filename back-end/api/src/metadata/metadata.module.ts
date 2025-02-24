@@ -17,7 +17,7 @@ import { StationElementsService } from './stations/services/station-elements.ser
 import { StationElementsController } from './stations/controllers/station-elements.controller';
 import { StationFormsController } from './stations/controllers/station-forms.controller';
 import { StationFormsService } from './stations/services/station-forms.service';
-import { StationObsEnvironmentEntity } from './stations/entities/station-observation-environment.entity';
+import { StationObservationEnvironmentEntity } from './stations/entities/station-observation-environment.entity';
 import { StationObservationFocusEntity } from './stations/entities/station-observation-focus.entity';
 import { StationObsEnvsController } from './stations/controllers/station-obs-envs.controller';
 import { StationObsEnvService } from './stations/services/station-obs-env.service';
@@ -29,16 +29,20 @@ import { SourcesService } from './sources/services/sources.service';
 import { RegionEntity } from './regions/entities/region.entity';
 import { SourceEntity } from './sources/entities/source.entity';
 import { ElementsService } from './elements/services/elements.service';
-import { QCTestEntity } from './elements/entities/qc-test.entity';
-import { QCTestsController } from './elements/controllers/qc-tests.controller';
-import { QCTestsService } from './elements/services/qc-tests.service';
-import { MetadataMigrationService } from './metadata-migration.service';
+import { ElementQCTestEntity } from './elements/entities/element-qc-test.entity';
+import { ElementsQCTestsController } from './elements/controllers/elements-qc-tests.controller';
+import { ElementsQCTestsService } from './elements/services/elements-qc-tests.service'; 
 import { RegionsController } from './regions/controllers/regions.controller';
 import { RegionsService } from './regions/services/regions.service';
 import { SharedModule } from 'src/shared/shared.module';
 import { OrganisationEntity } from './stations/entities/organisation.entity';
 import { NetworkAffiliationEntity } from './stations/entities/network-affiliation.entity';
 import { StationsImportExportService } from './stations/services/stations-import-export.service';
+import { StationNetworkAffiliationEntity } from './stations/entities/station-network-affiliation.entity';
+import { MetadataUpdatesController } from './metadata-updates/metadata-updates.controller';
+import { ElementTypesService } from './elements/services/element-types.service';
+import { ElementSubdomainsService } from './elements/services/element-subdomains.service';
+import { ElementsImportExportService } from './elements/services/elements-import-export.service';
 
 @Module({
     imports: [
@@ -52,15 +56,16 @@ import { StationsImportExportService } from './stations/services/stations-import
         OrganisationEntity,
         NetworkAffiliationEntity,
         RegionEntity,
-        StationObsEnvironmentEntity,
+        StationObservationEnvironmentEntity,
         StationObservationFocusEntity,
         StationEntity,
         StationElementEntity,
         StationFormEntity,
-        QCTestEntity
+        StationNetworkAffiliationEntity,
+        ElementQCTestEntity,
     ]),
         SharedModule,
-        UserModule
+        UserModule,
     ],
     controllers: [
         ElementsController,
@@ -72,10 +77,13 @@ import { StationsImportExportService } from './stations/services/stations-import
         StationsController,
         StationElementsController,
         StationFormsController,
-        QCTestsController,
-        RegionsController
+        ElementsQCTestsController,
+        RegionsController,
+        MetadataUpdatesController,
     ],
     providers: [
+        ElementSubdomainsService,
+        ElementTypesService,
         ElementsService,
         SourcesService,
         StationObsEnvService,
@@ -83,14 +91,15 @@ import { StationsImportExportService } from './stations/services/stations-import
         StationsService,
         StationElementsService,
         StationFormsService,
-        QCTestsService,
-        RegionsService,
-        MetadataMigrationService,
-        StationsImportExportService
+        ElementsQCTestsService,
+        RegionsService, 
+        StationsImportExportService,
+        ElementsImportExportService,
     ],
 
-    // TODO. Check if these need to be exported
     exports: [
+        ElementSubdomainsService,
+        ElementTypesService,
         ElementsService,
         SourcesService,
         StationObsEnvService,
@@ -98,9 +107,8 @@ import { StationsImportExportService } from './stations/services/stations-import
         StationsService,
         StationElementsService,
         StationFormsService,
-        QCTestsService,
+        ElementsQCTestsService,
         RegionsService,
-        MetadataMigrationService
     ]
 })
 export class MetadataModule { }

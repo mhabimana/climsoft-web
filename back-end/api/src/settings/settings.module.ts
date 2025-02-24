@@ -1,32 +1,29 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { GeneralSettingEntity } from './entities/general-setting.entity';
-import { UserSettingEntity } from './entities/user-setting.entity';
+import { GeneralSettingEntity } from './entities/general-setting.entity'; 
 import { SharedModule } from 'src/shared/shared.module';
 import { UserModule } from 'src/user/user.module';
 import { GeneralSettingController } from './controllers/general-settings.controller';
-import { GeneralSettingsService } from './services/general-settings.service';
-import { SettingsMigrationService } from './settings-migration.service';
+import { GeneralSettingsService } from './services/general-settings.service'; 
+import { MetadataModule } from 'src/metadata/metadata.module';
 
 @Module({
     imports: [
         TypeOrmModule.forFeature([
-            GeneralSettingEntity,
-            UserSettingEntity
+            GeneralSettingEntity, 
         ]),
         SharedModule,
-        UserModule
+        UserModule,
+        MetadataModule,
     ],
     controllers: [
-        GeneralSettingController
+        GeneralSettingController,
     ],
     providers: [
         GeneralSettingsService,
-        SettingsMigrationService
     ],
     exports: [
         GeneralSettingsService,
-        SettingsMigrationService
     ]
 })
 export class SettingsModule { }

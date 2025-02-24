@@ -1,25 +1,25 @@
-import { Location } from '@angular/common';
 import { HttpClient, HttpEventType, HttpParams } from '@angular/common/http';
-import { Component, EventEmitter, OnInit, Output } from '@angular/core';
-import { ActivatedRoute } from '@angular/router';
-import { catchError, take, throwError } from 'rxjs';
-import { ImportTabularSourceModel } from 'src/app/metadata/sources/models/create-import-source-tabular.model';
-import { CreateImportSourceModel } from 'src/app/metadata/sources/models/create-import-source.model';
-import { ViewSourceModel } from 'src/app/metadata/sources/models/view-source.model';
-import { PagesDataService } from 'src/app/core/services/pages-data.service';
-import { SourcesService } from 'src/app/core/services/sources/sources.service';
-import { environment } from 'src/environments/environment';
+import { Component, EventEmitter, Input, OnChanges, Output, SimpleChanges } from '@angular/core';
+import { catchError, throwError } from 'rxjs';
+import { PagesDataService, ToastEventTypeEnum } from 'src/app/core/services/pages-data.service'; 
+import { StationsCacheService } from '../services/stations-cache.service';
+import { AppConfigService } from 'src/app/app-config.service';
 
 @Component({
   selector: 'app-import-stations-dialog',
   templateUrl: './import-stations-dialog.component.html',
   styleUrls: ['./import-stations-dialog.component.scss']
 })
-export class ImportStationsDialogComponent implements OnInit {
-  @Output()
-  okClick = new EventEmitter<void>();
+export class ImportStationsDialogComponent implements OnChanges {
+  @Input()
+  public open: boolean = false;
 
-  protected open: boolean = false;
+  @Output()
+  public okClick = new EventEmitter<void>();
+
+  @Output()
+  public cancelClick = new EventEmitter<void>();
+
   protected uploadMessage: string = "";
   protected uploadError: boolean = false;
   protected showUploadProgress: boolean = false;
@@ -30,21 +30,30 @@ export class ImportStationsDialogComponent implements OnInit {
   protected fileName: string = "";
 
   constructor(
+    private appConfigService: AppConfigService,
+    private stationsCacheService: StationsCacheService,
     private pagesDataService: PagesDataService,
     private http: HttpClient) {
   }
 
+  ngOnChanges(changes: SimpleChanges): void {
+    if (this.open) {
+      this.setupDialog();
+    }
+  }
+
   public openDialog(): void {
     this.open = true;
+    this.setupDialog();
+  }
+
+  private setupDialog(): void {
     this.uploadMessage = "";
     this.uploadError = false;
     this.uploadProgress = 0;
     this.disableUpload = false;
-    this.fileInputEvent= undefined;
+    this.fileInputEvent = undefined;
     this.fileName = "";
-  }
-
-  ngOnInit(): void {
   }
 
   protected onFileSelected(fileInputEvent: any): void {
@@ -58,7 +67,7 @@ export class ImportStationsDialogComponent implements OnInit {
       return;
     }
 
-    if( this.disableUpload){
+    if (this.disableUpload) {
       return;
     }
 
@@ -76,9 +85,9 @@ export class ImportStationsDialogComponent implements OnInit {
     formData.append('file', selectedFile);
 
     const params = new HttpParams();
-    const url = `${environment.apiUrl}/stations/upload`;
+    const url = `${this.appConfigService.apiBaseUrl}/stations/upload`;
 
-    this.http.post(
+    this.http.put(
       url,
       formData,
       {
@@ -115,7 +124,10 @@ export class ImportStationsDialogComponent implements OnInit {
           let response: string = (event.body as any).message;
           if (response === "success") {
             this.open = false; // close the dialog
-            this.pagesDataService.showToast({ title: 'Stations Import', message: 'Stations imported successfully', type: 'success' })
+            this.pagesDataService.showToast({ title: 'Stations Import', message: 'Stations imported successfully', type: ToastEventTypeEnum.SUCCESS });
+
+            // Refresh the cache
+            this.stationsCacheService.checkForUpdates();
             this.okClick.emit();
           } else {
             this.uploadMessage = response;
@@ -126,6 +138,8 @@ export class ImportStationsDialogComponent implements OnInit {
 
   }
 
-
+  protected onCancelClick(): void {
+    this.cancelClick.emit();
+  }
 
 }

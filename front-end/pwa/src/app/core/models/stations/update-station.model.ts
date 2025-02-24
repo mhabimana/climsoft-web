@@ -1,13 +1,12 @@
 import { StationObsProcessingMethodEnum } from "./station-obs-Processing-method.enum";
-import { StationStatusEnum } from "./station-status.enum";
-import { PointModel } from "../point.model";
+import { StationStatusEnum } from "./station-status.enum"; 
 
 export interface UpdateStationModel {
   name: string;
   description: string;
-  longitude: number;
-  latitude: number; 
-  elevation: number ;
+  longitude: number | null;
+  latitude: number | null; 
+  elevation: number | null ;
   stationObsProcessingMethod: StationObsProcessingMethodEnum ;
   stationObsEnvironmentId: number | null;
   stationObsFocusId: number | null; 

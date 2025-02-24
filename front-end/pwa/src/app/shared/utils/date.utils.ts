@@ -9,16 +9,12 @@ export class DateUtils {
      * @param prefix 
      * @returns 
      */
-    static getDaysInMonthList(year: number, monthIndex: number, prefix?: string): { id: number, name: string }[] {
+    static getDaysInMonthList(year: number, monthIndex: number): { id: number, name: string }[] {
         const allDays: { id: number, name: string }[] = [];
         const lastDay: number = DateUtils.getLastDayOfMonth(year, monthIndex);
 
-        if (prefix === undefined) {
-            prefix = "Day "
-        }
-
         for (let i = 1; i <= lastDay; i++) {
-            allDays.push({ id: i, name: `${prefix}${i.toString().padStart(2, '0')}` });
+            allDays.push({ id: i, name: `${i.toString().padStart(2, '0')}` });
         }
         return allDays;
     }
@@ -37,7 +33,7 @@ export class DateUtils {
     static getHours(hourIds?: number[]): { id: number, name: string }[] {
         const allHours: { id: number, name: string }[] = [];
         for (let i = 0; i <= 23; i++) {
-            allHours.push({ id: i, name: `Hour ${i.toString().padStart(2, '0')}` });
+            allHours.push({ id: i, name: `${i.toString().padStart(2, '0')}` });
         }
 
         if (hourIds) {

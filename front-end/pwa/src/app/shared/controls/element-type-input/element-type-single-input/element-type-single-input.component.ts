@@ -1,7 +1,6 @@
 import { Component, EventEmitter, Input, OnChanges, OnInit, Output, SimpleChanges } from '@angular/core';
-import { ViewElementTypeModel } from 'src/app/core/models/elements/view-element-type.model';
 import { ElementTypesService } from 'src/app/core/services/elements/element-types.service';
-import { ElementsService } from 'src/app/core/services/elements/elements.service';
+import { ViewElementTypeModel } from 'src/app/metadata/elements/models/view-element-type.model';
 
 @Component({
   selector: 'app-element-type-single-input',
@@ -46,7 +45,8 @@ export class ElementTypeSingleInputComponent implements OnInit, OnChanges {
   }
 
   protected optionDisplayFunction(option: ViewElementTypeModel): string {
-    return `${option.domainName} - ${option.subdomainName} - ${option.name}`;
+    // TODO. Include the domain and subdomain name for display to distinguish them.
+    return `${option.name}`;
   }
 
   protected onSelectedOptionChange(selectedOption: ViewElementTypeModel | null) {

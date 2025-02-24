@@ -2,24 +2,23 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse, HttpParams } from '@angular/common/http';
 import { Observable, throwError } from 'rxjs';
 import { catchError } from 'rxjs/operators';
-import { ViewElementModel } from '../../models/elements/view-element.model';
-import { UpdateElementModel } from '../../models/elements/update-element.model';
-import { CreateElementModel } from '../../models/elements/create-element.model';
-import { ElementDomainEnum } from '../../models/elements/element-domain.enum';
-import { ViewElementSubdomainModel } from '../../models/elements/view-element-subdomain.model';
-import { ViewElementTypeModel } from '../../models/elements/view-element-type.model';
+import { ViewElementTypeModel } from 'src/app/metadata/elements/models/view-element-type.model';
+import { AppConfigService } from 'src/app/app-config.service';
+
+// TODO. Delete this later
 
 @Injectable({
   providedIn: 'root'
 })
 export class ElementTypesService {
 
-  private endPointUrl: string = " http://localhost:3000/element-types";
+  private endPointUrl: string;
 
-  constructor(private http: HttpClient) { }
+  constructor(private appConfigService: AppConfigService, private http: HttpClient) {
+    this.endPointUrl = `${this.appConfigService.apiBaseUrl}/element-types`;
+  }
 
-   
-  public getElementTypes(ids?: number[]): Observable<ViewElementTypeModel[]> { 
+  public getElementTypes(ids?: number[]): Observable<ViewElementTypeModel[]> {
     let params: HttpParams = new HttpParams();
 
     if (ids && ids.length > 0) {

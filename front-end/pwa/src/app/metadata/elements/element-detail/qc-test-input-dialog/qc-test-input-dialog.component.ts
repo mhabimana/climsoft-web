@@ -1,6 +1,6 @@
 import { Component, EventEmitter, Input, Output } from '@angular/core';
 import { Observable, take } from 'rxjs';
-import { CreateQCTestModel } from 'src/app/core/models/elements/qc-tests/create-qc-test.model';
+import { CreateElementQCTestModel } from 'src/app/core/models/elements/qc-tests/create-element-qc-test.model';
 import { ContextualQCTestParamsModel } from 'src/app/core/models/elements/qc-tests/qc-test-parameters/contextual-qc-test-params.model';
 import { FlatLineQCTestParamsModel } from 'src/app/core/models/elements/qc-tests/qc-test-parameters/flat-line-qc-test-params.model';
 import { QCTestParamConditionEnum } from 'src/app/core/models/elements/qc-tests/qc-test-parameters/qc-test-param-condition.enum';
@@ -9,10 +9,10 @@ import { RelationalQCTestParamsModel } from 'src/app/core/models/elements/qc-tes
 import { RepeatedValueQCTestParamsModel } from 'src/app/core/models/elements/qc-tests/qc-test-parameters/repeated-value-qc-test-params.model';
 import { SpikeQCTestParamsModel } from 'src/app/core/models/elements/qc-tests/qc-test-parameters/spike-qc-test-params.model';
 import { QCTestTypeEnum } from 'src/app/core/models/elements/qc-tests/qc-test-type.enum';
-import { UpdateQCTestModel } from 'src/app/core/models/elements/qc-tests/update-qc-test.model';
+import { ViewElementQCTestModel } from 'src/app/core/models/elements/qc-tests/view-element-qc-test.model';
 import { ElementsService } from 'src/app/core/services/elements/elements.service';
-import { QCTestsService } from 'src/app/core/services/elements/qc-tests.service';
-import { PagesDataService } from 'src/app/core/services/pages-data.service';
+import { ElementsQCTestsService } from 'src/app/metadata/elements/services/elements-qc-tests.service';
+import { PagesDataService, ToastEventTypeEnum } from 'src/app/core/services/pages-data.service';
 
 @Component({
   selector: 'app-qc-test-input-dialog',
@@ -25,14 +25,14 @@ export class QCTestInputDialogComponent {
 
   protected open: boolean = false;
   protected title: string = "";
-  protected updateQcTest!: UpdateQCTestModel;
+  protected updateQcTest!: ViewElementQCTestModel;
 
   constructor(
-    private qcTestsService: QCTestsService,
+    private qcTestsService: ElementsQCTestsService,
     private elementsService: ElementsService,
     private pagesDataService: PagesDataService) { }
 
-  public openDialog(elementId: number, updateQcTestModel?: UpdateQCTestModel): void {
+  public openDialog(elementId: number, updateQcTestModel?: ViewElementQCTestModel): void {
     this.open = true;
 
     // Set the element name
@@ -47,7 +47,7 @@ export class QCTestInputDialogComponent {
 
     if (updateQcTestModel) {
       this.updateQcTest = updateQcTestModel;
-      this.qcTestsService.findOne(updateQcTestModel.id).pipe(
+      this.qcTestsService.findById(updateQcTestModel.id).pipe(
         take(1)
       ).subscribe((data) => {
         this.updateQcTest = data;
@@ -164,7 +164,7 @@ export class QCTestInputDialogComponent {
   protected onOkClick(): void {
     // TODO. Do validations
 
-    const createQCTest: CreateQCTestModel = {
+    const createQCTest: CreateElementQCTestModel = {
       qcTestType: this.updateQcTest.qcTestType,
       elementId: this.updateQcTest.elementId,
       observationPeriod: this.updateQcTest.observationPeriod,
@@ -173,24 +173,24 @@ export class QCTestInputDialogComponent {
       comment: this.updateQcTest.comment
     }
 
-    let saveSubscription: Observable<UpdateQCTestModel>;
+    let saveSubscription: Observable<ViewElementQCTestModel>;
     if (this.updateQcTest.id > 0) {
       saveSubscription = this.qcTestsService.update(this.updateQcTest.id, createQCTest);
     } else {
-      saveSubscription = this.qcTestsService.create(createQCTest);
+      saveSubscription = this.qcTestsService.add(createQCTest);
     }
 
     saveSubscription.pipe(
       take(1)
     ).subscribe((data) => {
       let message: string;
-      let messageType: 'success' | 'error';
+      let messageType: ToastEventTypeEnum;
       if (data) {
         message = this.updateQcTest.id > 0 ? `QC test updated` : `QC test created`;
-        messageType = 'success';
+        messageType = ToastEventTypeEnum.SUCCESS;
       } else {
         message = "Error in saving qc test";
-        messageType = 'error';
+        messageType = ToastEventTypeEnum.ERROR;
       }
       this.pagesDataService.showToast({ title: "QC Tests", message: message, type: messageType });
       this.ok.emit();
@@ -202,13 +202,13 @@ export class QCTestInputDialogComponent {
       take(1)
     ).subscribe((data) => {
       let message: string;
-      let messageType: 'success' | 'error';
+      let messageType: ToastEventTypeEnum;
       if (data) {
         message = `qc test deleted`;
-        messageType = 'success';
+        messageType = ToastEventTypeEnum.SUCCESS;
       } else {
         message = "Error in deleting qc test";
-        messageType = 'error';
+        messageType = ToastEventTypeEnum.ERROR;
       }
       this.pagesDataService.showToast({ title: "QC Tests", message: message, type: messageType });
       this.ok.emit();

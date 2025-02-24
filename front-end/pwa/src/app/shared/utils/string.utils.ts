@@ -66,7 +66,11 @@ export class StringUtils {
     return str ? str[0].toUpperCase() + str.slice(1) : "";
   }
 
-  public static formatEnumForDisplay(option: string): string {
+  public static formatEnumForDisplay(option: string | null): string {
+    if (!option) {
+      return '';
+    }
+
     let wordToDisplay: string;
     const splitWords: string[] = option.split('_');
     if (splitWords.length > 1) {
@@ -91,7 +95,7 @@ export class StringUtils {
           httpParams = httpParams.set(key, value.join(','));
         } else {
           // Convert non-array values to string
-          // TODO, what about booleans? Investigate what effects string booleans mya have on dtos at the back end. 
+          // TODO, what about booleans? Investigate what effects string booleans may have on dtos at the back end. 
           httpParams = httpParams.set(key, value.toString());
         }
       }

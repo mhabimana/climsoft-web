@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, StreamableFile } from '@nestjs/common';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { Database } from "duckdb-async";
@@ -23,29 +23,6 @@ export class FileIOService {
     private async setupFileIO() {
         await this.setupTempFolder();
         await this.setupDuckDB();
-    }
-
-    public getFullFolderPath(folder: string): string {
-
-        //const fullFolderPath = path.join(process.cwd(), 'sql-scripts/observation_log.sql');
-
-        //console.log('dir: ', __dirname);
-        //console.log('process.cwd(): ', process.cwd());
-        //console.log('Join file path: ', fullFolderPath);
-
-        // Define paths for both development and production environments
-        const devPath = path.join(process.cwd(), 'api', 'src', 'sql-scripts', 'update_observations_log_column.sql');
-        const prodPath = path.join(process.cwd(), 'dist', 'sql-scripts', 'update_observations_log_column.sql');
-
-        // Determine the actual path to use based on environment
-        const filePath = fs.existsSync(devPath) ? devPath : prodPath;
-
-        console.log('filePath: ', filePath);
-
-        // For windows platform, replace the backslashes with forward slashes.
-        return path.resolve(`./${folder}`).replaceAll("\\", "\/");
-
-
     }
 
     private async setupTempFolder(): Promise<void> {
@@ -73,8 +50,8 @@ export class FileIOService {
         this._duckDb = await Database.create(`${this._tempFilesFolderPath}/duckdb_io.db`);
     }
 
-    public createReadStream(filePathName: string) {
-        return fs.createReadStream(filePathName);
+    public createStreamableFile(filePathName: string) {
+        return new StreamableFile(fs.createReadStream(filePathName));
     }
 
     public async readFile(filePathName: string, encoding: 'utf8' = 'utf8') {

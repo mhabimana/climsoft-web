@@ -1,32 +1,39 @@
-import { Component, OnInit } from '@angular/core';
+import { Component, ElementRef, OnDestroy, OnInit, ViewChild } from '@angular/core';
 import { Location } from '@angular/common';
 import { ActivatedRoute } from '@angular/router';
-import { ObservationsService } from 'src/app/core/services/observations/observations.service';
-import { StationsService } from 'src/app/core/services/stations/stations.service';
-import { PagesDataService } from 'src/app/core/services/pages-data.service';
-import { StringUtils } from 'src/app/shared/utils/string.utils'; 
+import { ObservationsService } from 'src/app/data-entry/services/observations.service';
+import { PagesDataService, ToastEventTypeEnum } from 'src/app/core/services/pages-data.service';
+import { StringUtils } from 'src/app/shared/utils/string.utils';
 import { CreateObservationModel } from 'src/app/core/models/observations/create-observation.model';
-import { catchError, of, switchMap, take } from 'rxjs';
+import { catchError, EMPTY, map, NEVER, of, Subject, Subscription, switchMap, take, takeUntil, throwError } from 'rxjs';
 import { FormEntryDefinition } from './defintions/form-entry.definition';
-import { ViewStationModel } from 'src/app/core/models/stations/view-station.model';
-import { ObservationDefinition } from './defintions/observation.definition';
 import { ViewSourceModel } from 'src/app/metadata/sources/models/view-source.model';
-import { ViewEntryFormModel } from 'src/app/metadata/sources/models/view-entry-form.model'; 
-import { SourcesService } from 'src/app/core/services/sources/sources.service';
+import { ViewEntryFormModel } from 'src/app/metadata/sources/models/view-entry-form.model';
 import { SameInputStruct } from './assign-same-input/assign-same-input.component';
-import { QCTestsService } from 'src/app/core/services/elements/qc-tests.service'; 
+import { ElementsQCTestsService } from 'src/app/metadata/elements/services/elements-qc-tests.service';
 import { QCTestTypeEnum } from 'src/app/core/models/elements/qc-tests/qc-test-type.enum';
-import { RangeThresholdQCTestParamsModel } from 'src/app/core/models/elements/qc-tests/qc-test-parameters/range-qc-test-params.model';
-import { UpdateQCTestModel } from 'src/app/core/models/elements/qc-tests/update-qc-test.model';
+import { ViewElementQCTestModel } from 'src/app/core/models/elements/qc-tests/view-element-qc-test.model';
+import { SourcesCacheService } from 'src/app/metadata/sources/services/sources-cache.service';
+import { StationCacheModel, StationsCacheService } from 'src/app/metadata/stations/services/stations-cache.service';
+import { DEFAULT_USER_FORM_SETTINGS, USER_FORM_SETTING_STORAGE_NAME, UserFormSettingsComponent, UserFormSettingStruct } from './user-form-settings/user-form-settings.component';
+import { LocalStorageService } from 'src/app/shared/services/local-storage.service';
+import { FindQCTestQueryModel } from 'src/app/metadata/elements/models/find-qc-test-query.model';
+import { ObservationDefinition } from './defintions/observation.definition';
+import { LnearLayoutComponent } from './linear-layout/linear-layout.component';
+import { GridLayoutComponent } from './grid-layout/grid-layout.component';
 
 @Component({
   selector: 'app-form-entry',
   templateUrl: './form-entry.component.html',
   styleUrls: ['./form-entry.component.scss']
 })
-export class FormEntryComponent implements OnInit {
+export class FormEntryComponent implements OnInit, OnDestroy {
+  @ViewChild('appLinearLayout') linearLayoutComponent!: LnearLayoutComponent;
+  @ViewChild('appGridLayout') gridLayoutComponent!: GridLayoutComponent; 
+  @ViewChild('saveButton') saveButton!: ElementRef;
+
   /** Station details */
-  protected station!: ViewStationModel;
+  protected station!: StationCacheModel;
 
   /** Source (form) details */
   protected source!: ViewSourceModel;
@@ -34,49 +41,113 @@ export class FormEntryComponent implements OnInit {
   /** Definitions used to determine form functionalities */
   protected formDefinitions!: FormEntryDefinition;
 
-  /** Enables or disables save button */
-  protected enableSave: boolean = false;
-
   private totalIsValid!: boolean;
 
-  protected displayHistoryOption: boolean = false;
+  protected displayExtraInfoOption: boolean = false;
 
   protected refreshLayout: boolean = false;
 
+  protected openSameInputDialog: boolean = false;
+  protected openUserFormSettingsDialog: boolean = false;
+
+  private destroy$ = new Subject<void>();
+
+  protected defaultYearMonthValue!: string;
+  protected defaultDateValue!: string;
+
+  protected userFormSettings: UserFormSettingStruct;
+
   constructor
     (private pagesDataService: PagesDataService,
-      private sourcesService: SourcesService,
-      private stationsService: StationsService,
+      private sourcesService: SourcesCacheService,
+      private stationsService: StationsCacheService,
       private observationService: ObservationsService,
-      private qcTestsService: QCTestsService,
+      private qcTestsService: ElementsQCTestsService,
       private route: ActivatedRoute,
-      private location: Location) {
+      private location: Location,
+      private localStorage: LocalStorageService,) {
     this.pagesDataService.setPageHeader('Data Entry');
+
+    //Set user form settings
+    const savedUserFormSetting = this.localStorage.getItem<UserFormSettingStruct>(USER_FORM_SETTING_STORAGE_NAME);
+    this.userFormSettings = savedUserFormSetting ? savedUserFormSetting : { ...DEFAULT_USER_FORM_SETTINGS }; // pass by value. Important
   }
 
   ngOnInit(): void {
     const stationId = this.route.snapshot.params['stationid'];
     const sourceId = +this.route.snapshot.params['sourceid'];
 
-    // Get station name and switch to form metadata retrieval
     this.stationsService.findOne(stationId).pipe(
-      take(1),
+      takeUntil(this.destroy$),
       switchMap(stationData => {
-        this.station = stationData;
-        return this.sourcesService.findOne(sourceId).pipe(take(1));
-      })
-    ).subscribe(sourceData => {
-      this.source = sourceData; 
-      // TODO. find a way of correctly chaining this.
-      // Get all the range threshold qc's
-      this.qcTestsService.findQCTestByType(QCTestTypeEnum.RANGE_THRESHOLD).pipe(take(1)).subscribe(data => {
-        const qcTests: UpdateQCTestModel[] = data.filter(item=> (!item.disabled));
-        this.formDefinitions = new FormEntryDefinition(this.station, this.source, this.source.parameters as ViewEntryFormModel, qcTests);
-        this.loadObservations();
-      });
+        if (!stationData) {
+          // Return empty if no station data
+          return EMPTY;
+        }
 
-    
+        this.station = stationData;
+
+        // Get source data
+        return this.sourcesService.findOne(sourceId).pipe(
+          takeUntil(this.destroy$),
+          switchMap(sourceData => {
+            if (!sourceData) {
+              // Return empty array if no source data or station data
+              return EMPTY;
+            }
+            this.source = sourceData;
+
+            const sourceParams = this.source.parameters as ViewEntryFormModel;
+            const findQCTestQuery: FindQCTestQueryModel = {
+              elementIds: sourceParams.elementIds,
+              qcTestTypes: [QCTestTypeEnum.RANGE_THRESHOLD],
+              observationPeriod: sourceParams.period,
+            };
+
+            // Get quality control tests
+            return this.qcTestsService.find(findQCTestQuery).pipe(
+              takeUntil(this.destroy$),
+
+              map(test => test.filter(item => !item.disabled))
+            );
+          })
+        );
+      })
+    ).subscribe({
+      next: (qcTests: ViewElementQCTestModel[]) => {
+        if (!this.station || !this.source) {
+          console.warn('Station or Source is missing.');
+          // TODO. Display a message or take some other action
+          return;
+        }
+
+        // Note, as of 09/01/2025, when user is online this will be raised twice due to the qc test service that finds the qc twice, locally and from server
+
+        this.formDefinitions = new FormEntryDefinition(
+          this.station,
+          this.source,
+          this.source.parameters as ViewEntryFormModel,
+          qcTests
+        );
+        this.loadObservations();
+
+        /** Gets default date value (YYYY-MM-DD) used by date selector */
+        this.defaultDateValue = new Date().toISOString().slice(0, 10);
+
+        // Gets default year-month value (YYYY-MM) used by year-month selector
+        this.defaultYearMonthValue =
+        `${this.formDefinitions.yearSelectorValue}-${StringUtils.addLeadingZero(this.formDefinitions.monthSelectorValue)}` ;
+      },
+      error: err => {
+        console.error(err);
+        // TODO. Display feedback to the user
+      }
     });
+  }
+
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   /**
@@ -107,26 +178,14 @@ export class FormEntryComponent implements OnInit {
     return this.formDefinitions.formMetadata.selectors.includes('HOUR');
   }
 
-  /** Gets default date value (YYYY-MM-DD) used by date selector */
-  protected get defaultDateValue(): string {
-    return new Date().toISOString().slice(0, 10);
-  }
-
-  /**
-   * Gets default year-month value (YYYY-MM) used by year-month selector
-   */
-  protected get defaultYearMonthValue(): string {
-    return this.formDefinitions.yearSelectorValue + '-' + StringUtils.addLeadingZero(this.formDefinitions.monthSelectorValue);
-  }
-
   protected get utcDifference(): string {
     const utcDiff: number = this.source.utcOffset;
     let strUtcDiff: string = "in";
 
     if (utcDiff > 0) {
-      strUtcDiff = `+${utcDiff}`;
-    } else if (utcDiff < 0) {
-      strUtcDiff = `-${Math.abs(utcDiff)}`;
+        strUtcDiff = `+${utcDiff}`;
+    } else if (utcDiff < 0) {    
+      strUtcDiff = `${utcDiff}`;
     }
 
     return ` (${strUtcDiff} UTC)`;
@@ -135,21 +194,16 @@ export class FormEntryComponent implements OnInit {
   /**
    * Loads any existing observations from the database
    */
-  private loadObservations() {
+  private loadObservations(): void {
     // Reset controls
     this.totalIsValid = false;
-    this.enableSave = false;
     this.refreshLayout = false;
-
-    this.observationService.findRaw(this.formDefinitions.createObservationQuery()).pipe(
+    this.changedObsDefs = [];
+    this.observationService.findEntryFormData(this.formDefinitions.createObservationQuery()).pipe(
       take(1),
-      catchError(error => {
-        console.error('Failed to load observation data', error);
-        return of([]); // TODO. Appropriate fallback needed
-      })
     ).subscribe(data => {
       this.formDefinitions.createEntryObsDefs(data);
-      this.refreshLayout = true;
+      this.refreshLayout = true;     
     });
 
   }
@@ -173,14 +227,13 @@ export class FormEntryComponent implements OnInit {
    * @param yearMonth 
    * @returns 
    */
-  protected onYearMonthChange(yearMonth: string | null): void {
-    if (yearMonth === null) {
+  protected onYearMonthChange(yearMonth: string | null ): void { 
+    if(!yearMonth){
       return;
     }
-
-    const date: Date = new Date(yearMonth);
-    this.formDefinitions.yearSelectorValue = date.getFullYear();
-    this.formDefinitions.monthSelectorValue = date.getMonth() + 1;
+    const splitValue = yearMonth.split('-');
+    this.formDefinitions.yearSelectorValue = +splitValue[0];
+    this.formDefinitions.monthSelectorValue = +splitValue[1];
     this.loadObservations();
   }
 
@@ -189,17 +242,15 @@ export class FormEntryComponent implements OnInit {
    * @param strDate 
    * @returns 
    */
-  protected onDateChange(strDate: string | null): void {
-    if (strDate === null) {
+  protected onDateChange(strDate: string | null ): void {
+    if(!strDate){
       return;
     }
-
-    const oDate: Date = new Date(strDate);
-    this.formDefinitions.yearSelectorValue = oDate.getFullYear();
-    this.formDefinitions.monthSelectorValue = oDate.getMonth() + 1;
-    this.formDefinitions.daySelectorValue = oDate.getDate();
+    const splitValue = strDate.split('-');
+    this.formDefinitions.yearSelectorValue = +splitValue[0];
+    this.formDefinitions.monthSelectorValue = +splitValue[1];
+    this.formDefinitions.daySelectorValue = +splitValue[2];
     this.loadObservations();
-
   }
 
   /**
@@ -217,124 +268,234 @@ export class FormEntryComponent implements OnInit {
   }
 
   /**
- * Handles changes in observation definitions by updating the internal state and
- * managing the ability to save based on the validity of changes.
- * 
- * @param observationDef The observation definition object to be processed.
- */
-  protected onValueChange(observationDef: ObservationDefinition): void {
-    // Determine the ability to save based on whether any observation changes a
-    this.enableOrDisableSave();
-  }
-
-  /**
    * Handles validation of total input from the layouts
    * @param totalIsValid 
    */
   protected onTotalIsValid(totalIsValid: boolean) {
     this.totalIsValid = totalIsValid;
-    this.enableOrDisableSave();
   }
-
-  /**
-   * Determine the ability to save based on whether there are changes and all observation changes are valid
-   */
-  private enableOrDisableSave(): void {
-    if (!this.formDefinitions) {
-      this.enableSave = false;
-      return;
-    }
-
-    // Set total as valid, because everything has been cleared
-    if (this.formDefinitions.formMetadata.requireTotalInput && !this.totalIsValid) {
-      this.enableSave = false;
-      return;
-    }
-
-    for (const obsDef of this.formDefinitions.allObsDefs) {
-      // Check for change validit 
-      if (!obsDef.observationChangeIsValid) {
-        this.enableSave = false;
-        return;
-      }
-    }
-
-    this.enableSave = true;
-  }
-
 
   /**
    * Updates its internal state depending on the options passed
-   * @param option  'Clear' | 'History'
+   * @param option  'Same Input' | 'Clear Input' | 'Add Extra Info' | 'Settings'
    */
-  protected onOptions(option: 'Same Input' | 'Clear Input' | 'Show History'): void {
+  protected onOptions(option: 'Same Input' | 'Clear Fields' | 'Extra Info' | 'Settings'): void {
     switch (option) {
-      case 'Clear Input':
+      case 'Same Input':
+        this.openSameInputDialog = true;
+        break;
+      case 'Clear Fields':
         this.clear();
         break;
-      case 'Show History':
-        this.displayHistoryOption = !this.displayHistoryOption;
+      case 'Extra Info':
+        this.displayExtraInfoOption = !this.displayExtraInfoOption;
+        break;
+      case 'Settings':
+        this.openUserFormSettingsDialog = true;
         break;
     }
-  }
-
-  protected assignSameValue(input: SameInputStruct): void {
-    for (const obsDef of this.formDefinitions.allObsDefs) {
-      // Check if value flag is empty
-      if (StringUtils.isNullOrEmpty(obsDef.valueFlagForDisplay)) {
-        // Set the new the value flag input
-        obsDef.updateValueFlagFromUserInput(input.valueFlag); 
-        obsDef.updateCommentInput(input.comment);
-      }
-
-    }
-
-    this.enableOrDisableSave();
   }
 
   /**
-  * Clears all the observation value fflags if they are not cleared and updates its internal state
-  */
-  private clear(): void {
+   * Sets the same value flag to all entry fields
+   * @param input 
+   */
+  protected onAssignSameValue(input: SameInputStruct): void {
     for (const obsDef of this.formDefinitions.allObsDefs) {
-      // Clear the value flag input
-      obsDef.updateValueFlagFromUserInput('');
-      obsDef.updateCommentInput('');
+      // Check if value flag is empty
+      if (StringUtils.isNullOrEmpty(obsDef.getvalueFlagForDisplay())) {
+        // Set the new the value flag input
+        obsDef.updateValueFlagFromUserInput(input.valueFlag);
+        obsDef.updateCommentInput(input.comment);
+      }
     }
 
-    this.enableOrDisableSave();
+    if(this.linearLayoutComponent){
+      this.linearLayoutComponent.sameInput(input.valueFlag, input.comment);
+    }
+    
+    if(this.gridLayoutComponent){
+      this.gridLayoutComponent.sameInput(input.valueFlag, input.comment);
+    }
+ 
   }
 
+  /**
+  * Clears all the observation value flags if they are not cleared and updates its internal state
+  */
+  private clear(): void {
+    // for (const obsDef of this.formDefinitions.allObsDefs) {
+    //   // Clear the value flag input
+    //   obsDef.updateValueFlagFromUserInput('');
+    //   obsDef.updateCommentInput('');
+    //   obsDef.updatePeriodInput(this.formDefinitions.formMetadata.period);
+    
+    // };
+
+    if(this.linearLayoutComponent){
+      this.linearLayoutComponent.clear();
+    }
+    
+    if(this.gridLayoutComponent){
+      this.gridLayoutComponent.clear();
+    }
+  }
+
+  protected onUserFormSettingsChange(userFormSettings: UserFormSettingStruct): void {
+    const savedUserFormSetting = this.localStorage.getItem<UserFormSettingStruct>(USER_FORM_SETTING_STORAGE_NAME);
+    if (savedUserFormSetting) {
+      this.userFormSettings = savedUserFormSetting
+    }
+  }
 
   /**
    * Handles saving of observations by sending the data to the server and updating intenal state
    */
   protected onSave(): void {
-    // Important, disable the save button. Useful for waiting the save results.
-    this.enableSave = false;
+    console.log('save clicked');
+    // Get observations that have changes and have either value or flag, that is, ignore blanks or unchanged values.
+    const savableObservations: CreateObservationModel[] | null = this.checkValidityAndGetChanges();
+    //console.log('saving: ',  newObservations)
+    if (savableObservations !== null) {
+      // Send to server for saving
+      this.observationService.bulkPutDataFromEntryForm(savableObservations).pipe(take(1)).subscribe((response) => {
+        let type: ToastEventTypeEnum;
+        if (response.includes('error')) {
+          type = ToastEventTypeEnum.ERROR;
+        } else if (response.includes('local')) {
+          type = ToastEventTypeEnum.WARNING;
+        } else if (response.includes('success')) {
+          type = ToastEventTypeEnum.SUCCESS;
+        } else {
+          type = ToastEventTypeEnum.INFO;
+        }
 
-    // Create required observation dtos 
-    const newObservations: CreateObservationModel[] = this.formDefinitions.allObsDefs.filter(item => item.observationChanged).map(item => item.observation);
+        this.pagesDataService.showToast({ title: 'Observations', message: response, type: type });
+
+        if (type !== ToastEventTypeEnum.ERROR) {
+          if (this.userFormSettings.incrementDateSelector) {
+            this.sequenceToNextDate();
+          }
+          this.loadObservations();
+        }
+      });
+    }
+  }
+
+  /**
+   * Determine the ability to save based on whether there are changes and all observation changes are valid
+   * @returns 
+   */
+  private checkValidityAndGetChanges(): CreateObservationModel[] | null {
+    if (!this.formDefinitions) {
+      this.pagesDataService.showToast({ title: 'Observations', message: `Form parameters not set`, type: ToastEventTypeEnum.ERROR });
+      return null;
+    }
+
+    // Set total as valid, because everything has been cleared
+    if (this.formDefinitions.formMetadata.requireTotalInput && !this.totalIsValid) {
+      this.pagesDataService.showToast({ title: 'Observations', message: `Total value not entered`, type: ToastEventTypeEnum.ERROR });
+      return null;
+    }
+
+    const newObservations: CreateObservationModel[] = [];
+
+    // CODE BLOCK THAT HAS THE BUG THAT ENFORCED USING EXPLICIT EVENT COMMUNICATION
+    //----------------------------------------
+    // for (const obsDef of this.formDefinitions.allObsDefs) {
+    //   // Check for change validity
+    //   if (!obsDef.observationChangeIsValid) {
+    //     this.pagesDataService.showToast({ title: 'Observations', message: `Invalid value detected`, type: ToastEventTypeEnum.ERROR });
+    //     return null;
+    //   }
+
+    //   //SERIOUS BUG THAT INVOLVES OBJECTS SOMEHOW NOT BEING PASSED BY REFERENCE. SOMETIMES IT DOESN'T HAPPEN
+    //   //----------------------------------------
+    //   // Get observations that have changes and have either value or flag, that is, ignore blanks or unchanged values.
+    //   if (obsDef.observationChanged && (obsDef.observation.value !== null || obsDef.observation.flag !== null)) {
+    //     newObservations.push(obsDef.observation);
+    //   }
+
+    // }
+    //----------------------------------------
+
+    for (const obsDef of this.changedObsDefs) {
+      // Check for change validity
+      if (!obsDef.observationChangeIsValid) {
+        this.pagesDataService.showToast({ title: 'Observations', message: `Invalid value detected`, type: ToastEventTypeEnum.ERROR });
+        return null;
+      }
+
+      // Get observations that have either value or flag, that is, ignore blanks
+      if (obsDef.observation.value !== null || obsDef.observation.flag !== null) {
+        newObservations.push(obsDef.observation);
+      }
+
+    }
 
     if (newObservations.length === 0) {
-      this.pagesDataService.showToast({ title: 'Observations', message: `No changes made`, type: 'info' });
+      this.pagesDataService.showToast({ title: 'Observations', message: `No changes made`, type: ToastEventTypeEnum.ERROR });
+      return null;
+    }
+
+    return newObservations;
+  }
+
+  private sequenceToNextDate(): void {
+    const currentYearValue: number = this.formDefinitions.yearSelectorValue;
+    const currentMonthValue: number = this.formDefinitions.monthSelectorValue; // 1-indexed (January = 1)
+    const today = new Date();
+
+    let newYear = currentYearValue;
+    let newMonth = currentMonthValue;
+    let newDay: number | null = null;
+
+    if (this.formDefinitions.daySelectorValue) {
+      let currentDayValue = this.formDefinitions.daySelectorValue;
+
+      const daysInMonth = new Date(newYear, newMonth, 0).getDate(); // Get days in the current month
+      if (currentDayValue < daysInMonth) {
+        newDay = currentDayValue + 1; // Sequence to the next day
+      } else {
+        // If it's the last day of the month, sequence to the first day of the next month
+        newDay = 1;
+        if (newMonth < 12) {
+          newMonth++;
+        } else {
+          // If it's December, sequence to January of the next year
+          newMonth = 1;
+          newYear++;
+        }
+      }
+    } else {
+      // If daySelectorValue is not defined, sequence to the next month
+      if (newMonth < 12) {
+        newMonth++;
+      } else {
+        // If it's December, sequence to January of the next year
+        newMonth = 1;
+        newYear++;
+      }
+    }
+
+    // Ensure sequencing does not exceed the current date
+    const newDate = new Date(newYear, newMonth - 1, newDay || 1); // Use 1 if no day is specified
+    if (newDate > today) {
+      console.warn("Sequencing exceeds the current date. No changes applied.");
       return;
     }
 
-    // Send to server for saving
-    this.observationService.save(newObservations).subscribe((data) => {
-      if (data) {
-        this.pagesDataService.showToast({
-          title: 'Observations', message: `${newObservations.length} observation${newObservations.length === 1 ? '' : 's'} saved`, type: 'success'
-        });
+    // Update the form definitions with the sequenced values
+    this.formDefinitions.yearSelectorValue = newYear;
+    this.formDefinitions.monthSelectorValue = newMonth;
+    if (newDay !== null) {
+      this.formDefinitions.daySelectorValue = newDay;
+      /** Gets default date value (YYYY-MM-DD) used by date selector */
+      this.defaultDateValue = this.formDefinitions.yearSelectorValue + '-' + StringUtils.addLeadingZero(this.formDefinitions.monthSelectorValue) + '-' + StringUtils.addLeadingZero(this.formDefinitions.daySelectorValue);
+    }
 
-        this.loadObservations();
-      } else {
-        this.pagesDataService.showToast({
-          title: 'Observations', message: `${newObservations.length} observation${newObservations.length === 1 ? '' : 's'} NOT saved`, type: 'error'
-        });
-      }
-    });
+    // Gets default year-month value (YYYY-MM) used by year-month selector
+    this.defaultYearMonthValue = this.formDefinitions.yearSelectorValue + '-' + StringUtils.addLeadingZero(this.formDefinitions.monthSelectorValue);
   }
 
   /**
@@ -344,5 +505,28 @@ export class FormEntryComponent implements OnInit {
     this.location.back();
   }
 
+  protected changedObsDefs: ObservationDefinition[] = [];
+
+  // Important note, this explicit event communication between components was adopted because inconsistent behavior was observed 
+  // when using mutable updates to nested objects, in this case the observation object that is part of the obdervation definition object, 
+  // this likely stems from Angular's reliance on object references for change detection.
+  protected onUserInputVF(obsDef: ObservationDefinition) {
+    const obsDefIndex: number = this.changedObsDefs.findIndex(item => item === obsDef);
+    if (obsDefIndex > -1) {
+      this.changedObsDefs.splice(obsDefIndex, 1);
+    }
+
+    // Ignore unchanged values
+    if (obsDef.observationChanged) {
+      this.changedObsDefs.push(obsDef);
+    }
+  }
+
+  protected onFocusSaveButton(): void {
+    // TODO. Investigate why this focus raises a click event.
+    console.log('save before focus');
+    this.saveButton.nativeElement.focus();
+    console.log('save after focus');
+  }
 
 }

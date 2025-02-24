@@ -1,15 +1,14 @@
-import { Component } from '@angular/core';
-import { CreateStationModel } from '../../core/models/stations/create-station.model';
+import { Component, OnDestroy } from '@angular/core';
 import { ActivatedRoute, Router } from '@angular/router';
 import { PagesDataService } from 'src/app/core/services/pages-data.service';
-import { StationFormsService } from 'src/app/core/services/stations/station-forms.service';
+import { StationFormsService } from 'src/app/metadata/stations/services/station-forms.service';
 import { ViewSourceModel } from 'src/app/metadata/sources/models/view-source.model';
 import { StationObsProcessingMethodEnum } from 'src/app/core/models/stations/station-obs-Processing-method.enum';
-import { Observable } from 'rxjs';
-import { ViewStationQueryModel } from 'src/app/core/models/stations/view-station-query.model';
-import { StationsCacheService } from 'src/app/core/services/stations/station-cache/stations-cache-service';
+import { Subject, takeUntil } from 'rxjs';
+import { StationCacheModel, StationsCacheService } from 'src/app/metadata/stations/services/stations-cache.service';
 
-export interface StationView extends CreateStationModel {
+export interface StationView {
+  station: StationCacheModel;
   forms?: ViewSourceModel[];
 }
 
@@ -18,10 +17,12 @@ export interface StationView extends CreateStationModel {
   templateUrl: './station-form-selection.component.html',
   styleUrls: ['./station-form-selection.component.scss']
 })
-export class StationFormSelectionComponent {
-
-  protected stations!: StationView[];
-  protected allStations!: StationView[];
+export class StationFormSelectionComponent implements OnDestroy {
+  protected allStationViews!: StationView[];
+  protected stationViews!: StationView[];
+  private searchedIds!: string[];
+  protected stationIdSelected: string | undefined;
+  private destroy$ = new Subject<void>();
 
   constructor(
     private pagesDataService: PagesDataService,
@@ -32,26 +33,48 @@ export class StationFormSelectionComponent {
 
     this.pagesDataService.setPageHeader('Select Station');
 
-    this.stationsCacheService.cachedStations.subscribe(data => {
-      this.allStations = data.filter(item => item.stationObsProcessingMethod === StationObsProcessingMethodEnum.MANUAL || item.stationObsProcessingMethod === StationObsProcessingMethodEnum.HYBRID);
-      this.stations = this.allStations;
+    this.stationsCacheService.cachedStations.pipe(
+      takeUntil(this.destroy$)
+    ).subscribe(data => {
+      // Filter manual and hybrid stations only
+      this.allStationViews = data.filter(
+        item => item.stationObsProcessingMethod === StationObsProcessingMethodEnum.MANUAL || item.stationObsProcessingMethod === StationObsProcessingMethodEnum.HYBRID
+      ).map(data => { return { station: data } });
+
+      this.filterBasedOnSearchedIds();
     });
-
   }
 
-  protected onSearchInput(stationQuery: ViewStationQueryModel): void {
-    // TODO. Later change this
-    this.stations = this.allStations;
+  ngOnDestroy() {
+    this.destroy$.next();
+    this.destroy$.complete();
+  }
 
-    if (stationQuery.stationIds) {
-      this.stations = this.allStations.filter(item => stationQuery.stationIds?.includes(item.id));
+  protected onSearchInput(searchedIds: string[]): void {
+    this.searchedIds = searchedIds;
+    this.filterBasedOnSearchedIds();
+  }
+
+  private filterBasedOnSearchedIds(): void {
+    this.stationViews = this.searchedIds && this.searchedIds.length > 0 ? this.allStationViews.filter(item => this.searchedIds.includes(item.station.id)) : this.allStationViews;
+  }
+
+  protected onStationSelected(stationView: StationView): void {
+    if (stationView.station.id === this.stationIdSelected) {
+      this.stationIdSelected = undefined;
+      return;
     }
-  }
 
-  protected loadStationForms(station: StationView): void {
-    if (!station.forms) {
-      this.stationFormsService.find(station.id).subscribe(data => {
-        station.forms = data;
+    this.stationIdSelected = stationView.station.id;
+
+    // No need to reload the station forms if already loaded if they have
+    if (!stationView.forms) {
+      this.stationFormsService.getFormsAssignedToStations(stationView.station.id).pipe(
+        takeUntil(this.destroy$)
+      ).subscribe(data => {
+        if (data) {
+          stationView.forms = data;
+        }
       });
     }
 

@@ -1,11 +1,11 @@
 import { Component, OnDestroy, OnInit } from '@angular/core';
 import { ViewPortSize, ViewportService } from 'src/app/core/services/view-port.service';
 import { PagesDataService, ToastEvent } from '../services/pages-data.service';
-import { Subscription, take } from 'rxjs';
-import { AuthService } from '../services/users/auth.service';
-import { ActivatedRoute, Router } from '@angular/router';
-import { UserRoleEnum } from '../models/users/user-role.enum';
-
+import { Subject, take, takeUntil } from 'rxjs';
+import { AppAuthService } from '../../app-auth.service';
+import { UserRoleEnum } from '../../admin/users/models/user-role.enum';
+import { ObservationsService } from 'src/app/data-entry/services/observations.service';
+import { FEATURES_MENU_ITEMS, mainMenus, MenuItem } from './menu-items';
 
 @Component({
   selector: 'app-home',
@@ -13,116 +13,41 @@ import { UserRoleEnum } from '../models/users/user-role.enum';
   styleUrls: ['./home.component.scss']
 })
 export class HomeComponent implements OnInit, OnDestroy {
-
-  //holds the features navigation items
-  protected featuresNavItems: any[] = [
-    {
-      name: 'Dashboard',
-      url: '/dashboard',
-      icon: 'bi bi-sliders',
-      open: false,
-      children: []
-    },
-    {
-      name: 'Data Entry',
-      url: '/data-entry',
-      icon: 'bi bi-file-earmark-text',
-      open: false,
-      children: [
-        {
-          name: 'Forms',
-          url: '/station-form-selection',
-          featureTitle: 'Form Data Entry'
-        },
-        {
-          name: 'Import',
-          url: '/import-selection',
-          featureTitle: 'Import Data Entry'
-        },
-        {
-          name: 'Manage Data',
-          url: '/manage-data',
-          featureTitle: 'View Entries'
-        }
-      ]
-    },
-
-    {
-      name: 'Metadata',
-      url: '/metadata',
-      icon: 'bi bi-chat-dots',
-      open: false,
-      children: [
-        {
-          name: 'Elements',
-          url: '/elements',
-          featureTitle: 'Elements'
-        },
-        {
-          name: 'Sources',
-          url: '/sources',
-          featureTitle: 'Sources'
-        },
-        {
-          name: 'Stations',
-          url: '/stations',
-          featureTitle: 'Stations'
-        },
-        {
-          name: 'Regions',
-          url: '/view-regions',
-          featureTitle: 'Regions'
-        }
-      ]
-    },
-    {
-      name: 'Users',
-      url: '/user',
-      icon: 'bi bi-people',
-      open: false,
-      children: []
-    },
-    {
-      name: 'Settings',
-      url: '/settings',
-      icon: 'bi bi-people',
-      open: false,
-      children: [
-        {
-          name: 'General',
-          url: '/view-general-settings',
-          featureTitle: 'General'
-        },
-      ]
-    }
-
-
-  ];
-
+  protected featuresNavItems: MenuItem[] = FEATURES_MENU_ITEMS;
   protected bOpenSideNav: boolean = false;
   protected pageHeaderName: string = '';
   protected toasts: ToastEvent[] = [];
-  protected userSub!: Subscription;
+  protected unsyncedObservations: string = '';
   protected displayUserDropDown: boolean = false;
+  private destroy$ = new Subject<void>();
 
-  constructor(private viewPortService: ViewportService,
-    private authService: AuthService,
-    private pagesDataService: PagesDataService) {
+  constructor(
+    private appViewPortService: ViewportService,
+    private appAuthService: AppAuthService,
+    private appPagesDataService: PagesDataService,
+    private observationsService: ObservationsService,) {
   }
 
   ngOnInit(): void {
-    this.userSub = this.authService.user.subscribe(user => {
+    // Subscribe to the user changes
+    this.appAuthService.user.pipe(
+      takeUntil(this.destroy$),
+    ).subscribe(user => {
       if (user) {
         this.setAllowedNavigationLinks(user.role);
       }
     });
 
-    this.viewPortService.viewPortSize.subscribe((viewPortSize) => {
+    // Subscribe to the app view port size changes
+    this.appViewPortService.viewPortSize.subscribe((viewPortSize) => {
       this.bOpenSideNav = viewPortSize === ViewPortSize.LARGE;
     });
 
-    this.pagesDataService.pageHeader.subscribe(name => {
-      // To prevent `ExpressionChangedAfterItHasBeenCheckedError` raised in dvelopment mode 
+    // Subscribe to the oage header changes
+    this.appPagesDataService.pageHeader.pipe(
+      takeUntil(this.destroy$),
+    ).subscribe(name => {
+      // To prevent `ExpressionChangedAfterItHasBeenCheckedError` raised in development mode 
       // where a child component changes a parent component’s data during a lifecycle hook like `ngOnInit` or ``ngAfterViewInit`
       // Wrap the changes in time out function
       setTimeout(() => {
@@ -132,18 +57,38 @@ export class HomeComponent implements OnInit, OnDestroy {
 
     });
 
-    this.pagesDataService.toastEvents.subscribe(toast => {
+    // Subscribe to the toast events
+    this.appPagesDataService.toastEvents.pipe(
+      takeUntil(this.destroy$),
+    ).subscribe(toast => {
       this.showToast(toast);
     });
+
+    // Subscribe to sync operations
+    this.observationsService.unsyncedObservations.pipe(
+      takeUntil(this.destroy$),
+    ).subscribe(unsynced => {
+      if (unsynced === 0) {
+        this.unsyncedObservations = '';
+      } else if (unsynced > 9000) {
+        this.unsyncedObservations = `${unsynced}+`;
+      } else {
+        this.unsyncedObservations = `${unsynced}`;
+      }
+    });
+
+    // Sync observations if there is internet
+    this.observationsService.syncObservations();
   }
 
   ngOnDestroy(): void {
-    this.userSub.unsubscribe();
+    this.destroy$.next();
+    this.destroy$.complete();
   }
 
   protected logOut(): void {
-    this.authService.logout().pipe(take(1)).subscribe(data => {
-      this.authService.removeUser();
+    this.appAuthService.logout().pipe(take(1)).subscribe(data => {
+      this.appAuthService.removeUser();
       //TODO. test why this doesn't work here but works in app component. Has something to do with the route .
       //should go to app component route
       //this.router.navigate(['../../login']);
@@ -162,11 +107,16 @@ export class HomeComponent implements OnInit, OnDestroy {
   }
 
   private setAllowedNavigationLinks(role: UserRoleEnum): void {
-    // TODO. Change this implementation after changing the structure of the array
+    // Change the navigation links accessible if user not admin
     if (role !== UserRoleEnum.ADMINISTRATOR) {
-      this.featuresNavItems.splice(3, 1);
+      // TODO. Later we should allow certain aspects of metadata to be accessible by users that are not admins
+      const adminModules: mainMenus[] = ['Metadata', 'Admin'];
+      this.featuresNavItems = this.featuresNavItems.filter(item => !adminModules.includes(item.name));
     }
+  }
 
+  protected syncObservations() {
+    this.observationsService.syncObservations();
   }
 
 

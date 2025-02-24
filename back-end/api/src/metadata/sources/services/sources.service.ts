@@ -1,14 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { FindManyOptions, FindOptionsWhere, In, Repository } from 'typeorm';
+import { FindManyOptions, FindOptionsWhere, In, MoreThan, Repository } from 'typeorm';
 import { InjectRepository } from '@nestjs/typeorm';
-import { ViewSourceDto } from '../dtos/view-source.dto'; 
+import { ViewSourceDto } from '../dtos/view-source.dto';
 import { CreateUpdateSourceDto } from '../dtos/create-update-source.dto';
-import { SourceTypeEnum } from 'src/metadata/sources/enums/source-type.enum'; 
+import { SourceTypeEnum } from 'src/metadata/sources/enums/source-type.enum';
 import { CreateEntryFormDTO } from '../dtos/create-entry-form.dto';
 import { ViewEntryFormDTO } from '../dtos/view-entry-form.dto';
 import { SourceEntity } from '../entities/source.entity';
 import { ElementsService } from 'src/metadata/elements/services/elements.service';
-import { ViewElementDto } from 'src/metadata/elements/dtos/elements/view-element.dto';
+import { MetadataUpdatesQueryDto } from 'src/metadata/metadata-updates/dtos/metadata-updates-query.dto';
+import { MetadataUpdatesDto } from 'src/metadata/metadata-updates/dtos/metadata-updates.dto';
+import { CreateViewElementDto } from 'src/metadata/elements/dtos/elements/create-view-element.dto';
 
 // TODO refactor this service later
 
@@ -69,19 +71,26 @@ export class SourcesService {
         return entity;
     }
 
-    public async create(dto: CreateUpdateSourceDto, userId: number): Promise<ViewSourceDto> {
-        //source entity will be created with an auto incremented id
-        const entity = this.sourceRepo.create({
+    public async put(dto: CreateUpdateSourceDto, userId: number): Promise<ViewSourceDto> {
+        // sources are required to have unique names
+        let entity = await this.sourceRepo.findOneBy({
             name: dto.name,
-            description: dto.description,
-            sourceType: dto.sourceType,
-            utcOffset: dto.utcOffset,
-            allowMissingValue: dto.allowMissingValue,
-            scaleValues: dto.scaleValues,
-            sampleImage: dto.sampleImage,
-            parameters: dto.parameters,
-            entryUserId: userId
         });
+
+        if (!entity) {
+            entity = this.sourceRepo.create({
+                name: dto.name,
+            });
+        }
+
+        entity.description = dto.description;
+        entity.sourceType = dto.sourceType;
+        entity.utcOffset = dto.utcOffset;
+        entity.allowMissingValue = dto.allowMissingValue;
+        entity.scaleValues = dto.scaleValues;
+        entity.sampleImage = dto.sampleImage;
+        entity.parameters = dto.parameters;
+        entity.entryUserId = userId;
 
         await this.sourceRepo.save(entity);
 
@@ -110,6 +119,13 @@ export class SourcesService {
         return id;
     }
 
+    public async deleteAll(): Promise<boolean> {
+        const entities: SourceEntity[] = await this.sourceRepo.find();
+        // Note, don't use .clear() because truncating a table referenced in a foreign key constraint is not supported
+        await this.sourceRepo.remove(entities);
+        return true;
+    }
+
     private async createViewDto(entity: SourceEntity): Promise<ViewSourceDto> {
         const dto: ViewSourceDto = {
             id: entity.id,
@@ -123,14 +139,44 @@ export class SourcesService {
             scaleValues: entity.scaleValues
         }
 
+        // TODO. Remove this block. Forms can now use cached elements and reconstruct this on the front end
         if (dto.sourceType == SourceTypeEnum.FORM) {
             const createEntryFormDTO: CreateEntryFormDTO = dto.parameters as CreateEntryFormDTO
-            const elementsMetadata: ViewElementDto[] = await this.elementsService.find({elementIds: createEntryFormDTO.elementIds});
+            const elementsMetadata: CreateViewElementDto[] = await this.elementsService.find({ elementIds: createEntryFormDTO.elementIds });
             const viewEntryForm: ViewEntryFormDTO = { ...createEntryFormDTO, elementsMetadata, isValid: () => true }
             dto.parameters = viewEntryForm;
         }
 
         return dto;
+    }
+
+    public async checkUpdates(updatesQueryDto: MetadataUpdatesQueryDto): Promise<MetadataUpdatesDto> {
+        let changesDetected: boolean = false;
+
+        const serverCount = await this.sourceRepo.count();
+
+        if (serverCount !== updatesQueryDto.lastModifiedCount) {
+            // If number of records in server are not the same as those in the client then changes detected
+            changesDetected = true;
+        } else {
+            const whereOptions: FindOptionsWhere<SourceEntity> = {};
+
+            if (updatesQueryDto.lastModifiedDate) {
+                whereOptions.entryDateTime = MoreThan(new Date(updatesQueryDto.lastModifiedDate));
+            }
+
+            // If there was any changed record then changes detected
+            changesDetected = (await this.sourceRepo.count({ where: whereOptions })) > 0
+        }
+
+        if (changesDetected) {
+            // If any changes detected then return all records 
+            const allRecords = await this.findAll();
+            return { metadataChanged: true, metadataRecords: allRecords }
+        } else {
+            // If no changes detected then indicate no metadata changed
+            return { metadataChanged: false }
+        }
     }
 
 }
